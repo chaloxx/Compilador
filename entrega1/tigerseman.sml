@@ -42,24 +42,40 @@ fun tiposIguales (TRecord _) TNil = true
   | tiposIguales TNil (TRecord _) = true 
   | tiposIguales (TRecord (_, u1)) (TRecord (_, u2 )) = (u1=u2)
   | tiposIguales (TArray (_, u1)) (TArray (_, u2)) = (u1=u2)
+  | tiposIguales (TInt _) (TInt _) = true
   | tiposIguales a b = (a=b)
+
+fun tiposIgualesList ([],[]) = true
+    | tiposIgualesList (x::xs,y::ys) = (tiposIguales x y) andalso tiposIgualesList (xs,ys)
+    | tiposIgualesList (x::xs,[]) = false
+    | tiposIgualesList ([],y::ys) = false
 
 fun transExp(venv, tenv) =
 	let fun error(s, p) = raise Fail ("Error -- línea "^Int.toString(p)^": "^s^"\n")
+            fun msg1(f) = "Los tipos de los argumentos de " ^ f ^ " no coinciden con los tipos de sus parámetros"
+            fun msg2(f) = f ^ " no es una función"
+            fun msg3(f) = f ^ " no está definida"
 		fun trexp(VarExp v) = trvar(v)
 		| trexp(UnitExp _) = {exp=SCAF, ty=TUnit}
 		| trexp(NilExp _)= {exp=SCAF, ty=TNil}
 		| trexp(IntExp(i, _)) = {exp=SCAF, ty=TInt RW}
 		| trexp(StringExp(s, _)) = {exp=SCAF, ty=TString}
-		| trexp(CallExp({func, args}, nl)) =
-			{exp=SCAF, ty=TUnit} (*COMPLETAR*)
+		| trexp(CallExp({func, args}, nl)) = (case tabBusca(func,venv) of 
+                                                        SOME (Func reg) => let val t1 = map trexp args
+                                                                               val t2 = map (fn x => #ty x) t1
+                                                                           in if tiposIgualesList (t2,#formals reg) then {exp=SCAF, ty= #result reg}
+                                                                              else error (msg1(func),nl)
+                                                                           end
+                                                        |SOME _  => error (msg2(func),nl)
+                                                        |NONE => error (msg3(func),nl))
+
+		
 		| trexp(OpExp({left, oper=EqOp, right}, nl)) =
 			let
 				val {exp=_, ty=tyl} = trexp left
 				val {exp=_, ty=tyr} = trexp right
-			in
-				if tiposIguales tyl tyr andalso not (tyl=TNil andalso tyr=TNil) andalso tyl<>TUnit then {exp=SCAF, ty=TInt RW}
-					else error("Tipos no comparables", nl)
+                        in     if tiposIguales tyl tyr andalso not (tyl=TNil andalso tyr=TNil) andalso tyl<>TUnit then {exp=SCAF, ty=TInt RW}
+			       else error("Tipos no comparables", nl)
 			end
 		| trexp(OpExp({left, oper=NeqOp, right}, nl)) = 
 			let
