@@ -12,7 +12,7 @@ type tenv = (string, Tipo) tigertab.Tabla
 
 val tab_tipos : (string, Tipo) Tabla = tabInserList(
 	tabNueva(),
-	[("int", TInt), ("string", TString)])
+	[("int", TInt RW), ("string", TString)])
 
 val tab_vars : (string, EnvEntry) Tabla = tabInserList(
 	tabNueva(),
@@ -23,19 +23,19 @@ val tab_vars : (string, EnvEntry) Tabla = tabInserList(
 	("getchar", Func{level=mainLevel, label="getstr",
 		formals=[], result=TString, extern=true}),
 	("ord", Func{level=mainLevel, label="ord",
-		formals=[TString], result=TInt, extern=true}),
+		formals=[TString], result=TInt RW, extern=true}),
 	("chr", Func{level=mainLevel, label="chr",
-		formals=[TInt], result=TString, extern=true}),
+		formals=[TInt RW], result=TString, extern=true}),
 	("size", Func{level=mainLevel, label="size",
-		formals=[TString], result=TInt, extern=true}),
+		formals=[TString], result=TInt RW, extern=true}),
 	("substring", Func{level=mainLevel, label="substring",
-		formals=[TString, TInt, TInt], result=TString, extern=true}),
+		formals=[TString, TInt RW, TInt RW], result=TString, extern=true}),
 	("concat", Func{level=mainLevel, label="concat",
 		formals=[TString, TString], result=TString, extern=true}),
 	("not", Func{level=mainLevel, label="not",
-		formals=[TInt], result=TInt, extern=true}),
+		formals=[TInt RW], result=TInt RW, extern=true}),
 	("exit", Func{level=mainLevel, label="exit",
-		formals=[TInt], result=TUnit, extern=true})
+		formals=[TInt RW], result=TUnit, extern=true})
 	])
 
 fun tiposIguales (TRecord _) TNil = true
@@ -49,7 +49,7 @@ fun transExp(venv, tenv) =
 		fun trexp(VarExp v) = trvar(v)
 		| trexp(UnitExp _) = {exp=SCAF, ty=TUnit}
 		| trexp(NilExp _)= {exp=SCAF, ty=TNil}
-		| trexp(IntExp(i, _)) = {exp=SCAF, ty=TInt}
+		| trexp(IntExp(i, _)) = {exp=SCAF, ty=TInt RW}
 		| trexp(StringExp(s, _)) = {exp=SCAF, ty=TString}
 		| trexp(CallExp({func, args}, nl)) =
 			{exp=SCAF, ty=TUnit} (*COMPLETAR*)
@@ -58,7 +58,7 @@ fun transExp(venv, tenv) =
 				val {exp=_, ty=tyl} = trexp left
 				val {exp=_, ty=tyr} = trexp right
 			in
-				if tiposIguales tyl tyr andalso not (tyl=TNil andalso tyr=TNil) andalso tyl<>TUnit then {exp=SCAF, ty=TInt}
+				if tiposIguales tyl tyr andalso not (tyl=TNil andalso tyr=TNil) andalso tyl<>TUnit then {exp=SCAF, ty=TInt RW}
 					else error("Tipos no comparables", nl)
 			end
 		| trexp(OpExp({left, oper=NeqOp, right}, nl)) = 
@@ -66,7 +66,7 @@ fun transExp(venv, tenv) =
 				val {exp=_, ty=tyl} = trexp left
 				val {exp=_, ty=tyr} = trexp right
 			in
-				if tiposIguales tyl tyr andalso not (tyl=TNil andalso tyr=TNil) andalso tyl<>TUnit then {exp=SCAF, ty=TInt}
+				if tiposIguales tyl tyr andalso not (tyl=TNil andalso tyr=TNil) andalso tyl<>TUnit then {exp=SCAF, ty=TInt RW}
 					else error("Tipos no comparables", nl)
 			end
 		| trexp(OpExp({left, oper, right}, nl)) = 
@@ -76,14 +76,14 @@ fun transExp(venv, tenv) =
 			in
 				if tiposIguales tyl tyr then
 					case oper of
-						PlusOp => if tyl=TInt then {exp=SCAF,ty=TInt} else error("Error de tipos", nl)
-						| MinusOp => if tyl=TInt then {exp=SCAF,ty=TInt} else error("Error de tipos", nl)
-						| TimesOp => if tyl=TInt then {exp=SCAF,ty=TInt} else error("Error de tipos", nl)
-						| DivideOp => if tyl=TInt then {exp=SCAF,ty=TInt} else error("Error de tipos", nl)
-						| LtOp => if tyl=TInt orelse tyl=TString then {exp=SCAF,ty=TInt} else error("Error de tipos", nl)
-						| LeOp => if tyl=TInt orelse tyl=TString then {exp=SCAF,ty=TInt} else error("Error de tipos", nl)
-						| GtOp => if tyl=TInt orelse tyl=TString then {exp=SCAF,ty=TInt} else error("Error de tipos", nl)
-						| GeOp => if tyl=TInt orelse tyl=TString then {exp=SCAF,ty=TInt} else error("Error de tipos", nl)
+						PlusOp => if tyl=TInt RW then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
+						| MinusOp => if tyl=TInt RW then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
+						| TimesOp => if tyl=TInt RW then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
+						| DivideOp => if tyl=TInt RW then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
+						| LtOp => if tyl=TInt RW orelse tyl=TString then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
+						| LeOp => if tyl=TInt RW orelse tyl=TString then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
+						| GtOp => if tyl=TInt RW orelse tyl=TString then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
+						| GeOp => if tyl=TInt RW orelse tyl=TString then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
 						| _ => raise Fail "No debería pasar! (3)"
 				else error("Error de tipos", nl)
 			end
@@ -125,14 +125,14 @@ fun transExp(venv, tenv) =
 			    val {exp=thenexp, ty=tythen} = trexp then'
 			    val {exp=elseexp, ty=tyelse} = trexp else'
 			in
-				if tytest=TInt andalso tiposIguales tythen tyelse then {exp=SCAF, ty=tythen}
+				if tytest=TInt RW andalso tiposIguales tythen tyelse then {exp=SCAF, ty=tythen}
 				else error("Error de tipos en if" ,nl)
 			end
 		| trexp(IfExp({test, then', else'=NONE}, nl)) =
 			let val {exp=exptest,ty=tytest} = trexp test
 			    val {exp=expthen,ty=tythen} = trexp then'
 			in
-				if tytest=TInt andalso tythen=TUnit then {exp=SCAF, ty=TUnit}
+				if tytest=TInt RW andalso tythen=TUnit then {exp=SCAF, ty=TUnit}
 				else error("Error de tipos en if", nl)
 			end
 		| trexp(WhileExp({test, body}, nl)) =
@@ -140,8 +140,8 @@ fun transExp(venv, tenv) =
 				val ttest = trexp test
 				val tbody = trexp body
 			in
-				if (#ty ttest) = TInt andalso #ty tbody = TUnit then {exp=SCAF, ty=TUnit}
-				else if (#ty ttest) <> TInt then error("Error de tipo en la condición", nl)
+				if (#ty ttest) = TInt RW andalso #ty tbody = TUnit then {exp=SCAF, ty=TUnit}
+				else if (#ty ttest) <> TInt RW then error("Error de tipo en la condición", nl)
 				else error("El cuerpo de un while no puede devolver un valor", nl)
 			end
 		| trexp(ForExp({var, escape, lo, hi, body}, nl)) =
