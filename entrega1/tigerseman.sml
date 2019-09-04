@@ -39,7 +39,7 @@ val tab_vars : (string, EnvEntry) Tabla = tabInserList(
 	])
 
 fun tiposIguales (TRecord _) TNil = true
-  | tiposIguales TNil (TRecord _) = true 
+  | tiposIguales TNil (TRecord _) = true
   | tiposIguales (TRecord (_, u1)) (TRecord (_, u2 )) = (u1=u2)
   | tiposIguales (TArray (_, u1)) (TArray (_, u2)) = (u1=u2)
   | tiposIguales (TInt _) (TInt _) = true
@@ -49,6 +49,32 @@ fun tiposIgualesList ([],[]) = true
     | tiposIgualesList (x::xs,y::ys) = (tiposIguales x y) andalso tiposIgualesList (xs,ys)
     | tiposIgualesList (x::xs,[]) = false
     | tiposIgualesList ([],y::ys) = false
+
+
+fun searchList([],_) = NONE
+    | searchList((s2,x)::xs,s) = if s = s2 then SOME x
+	                             else searchList (xs,s)
+
+
+fun trfun dec tenv = let val typs = map (trparams tenv) (#params dec)
+                     in
+               {level = mainLevel, label = #name dec,formals = typs}
+
+
+
+fun trparams tenv p = case #typ p of
+                       NameTy s => (case tabBusca(s,tenv) of
+					                 NONE => error(s^ " no es un tipo",nl)
+									 SOME t => t
+				       |_ => error("No es un NameTy",nl)
+
+{name: symbol, params: field list,
+		result: symbol option, body: exp} * pos)
+
+
+{level: unit, label: tigertemp.label, (*level le damos mainLevel por ahora y label un string*)
+	formals: Tipo list, result: Tipo, extern: bool}
+
 
 fun transExp(venv, tenv) =
 	let fun error(s, p) = raise Fail ("Error -- línea "^Int.toString(p)^": "^s^"\n")
@@ -60,7 +86,7 @@ fun transExp(venv, tenv) =
 		| trexp(NilExp _)= {exp=SCAF, ty=TNil}
 		| trexp(IntExp(i, _)) = {exp=SCAF, ty=TInt RW}
 		| trexp(StringExp(s, _)) = {exp=SCAF, ty=TString}
-		| trexp(CallExp({func, args}, nl)) = (case tabBusca(func,venv) of 
+		| trexp(CallExp({func, args}, nl)) = (case tabBusca(func,venv) of
                                                         SOME (Func reg) => let val t1 = map trexp args
                                                                                val t2 = map (fn x => #ty x) t1
                                                                            in if tiposIgualesList (t2,#formals reg) then {exp=SCAF, ty= #result reg}
@@ -69,7 +95,7 @@ fun transExp(venv, tenv) =
                                                         |SOME _  => error (msg2(func),nl)
                                                         |NONE => error (msg3(func),nl))
 
-		
+
 		| trexp(OpExp({left, oper=EqOp, right}, nl)) =
 			let
 				val {exp=_, ty=tyl} = trexp left
@@ -77,7 +103,7 @@ fun transExp(venv, tenv) =
                         in     if tiposIguales tyl tyr andalso not (tyl=TNil andalso tyr=TNil) andalso tyl<>TUnit then {exp=SCAF, ty=TInt RW}
 			       else error("Tipos no comparables", nl)
 			end
-		| trexp(OpExp({left, oper=NeqOp, right}, nl)) = 
+		| trexp(OpExp({left, oper=NeqOp, right}, nl)) =
 			let
 				val {exp=_, ty=tyl} = trexp left
 				val {exp=_, ty=tyr} = trexp right
@@ -85,7 +111,7 @@ fun transExp(venv, tenv) =
 				if tiposIguales tyl tyr andalso not (tyl=TNil andalso tyr=TNil) andalso tyl<>TUnit then {exp=SCAF, ty=TInt RW}
 					else error("Tipos no comparables", nl)
 			end
-		| trexp(OpExp({left, oper, right}, nl)) = 
+		| trexp(OpExp({left, oper, right}, nl)) =
 			let
 				val {exp=_, ty=tyl} = trexp left
 				val {exp=_, ty=tyr} = trexp right
@@ -114,7 +140,7 @@ fun transExp(venv, tenv) =
 						TRecord (cs, u) => (TRecord (cs, u), cs)
 						| _ => error(typ^" no es de tipo record", nl))
 					| NONE => error("Tipo inexistente ("^typ^")", nl)
-				
+
 				(* Verificar que cada campo esté en orden y tenga una expresión del tipo que corresponde *)
 				fun verificar [] [] = ()
 				  | verificar (c::cs) [] = error("Faltan campos", nl)
@@ -166,24 +192,51 @@ fun transExp(venv, tenv) =
 			let
 				val (venv', tenv', _) = List.foldl (fn (d, (v, t, _)) => trdec(v, t) d) (venv, tenv, []) decs
 				val {exp=expbody,ty=tybody}=transExp (venv', tenv') body
-			in 
+			in
 				{exp=SCAF, ty=tybody}
 			end
 		| trexp(BreakExp nl) =
 			{exp=SCAF, ty=TUnit} (*COMPLETAR*)
 		| trexp(ArrayExp({typ, size, init}, nl)) =
 			{exp=SCAF, ty=TUnit} (*COMPLETAR*)
-		and trvar(SimpleVar s, nl) =
-			{exp=SCAF, ty=TUnit} (*COMPLETAR*)
-		| trvar(FieldVar(v, s), nl) =
-			{exp=SCAF, ty=TUnit} (*COMPLETAR*)
-		| trvar(SubscriptVar(v, e), nl) =
-			{exp=SCAF, ty=TUnit} (*COMPLETAR*)
-		and trdec (venv, tenv) (VarDec ({name,escape,typ=NONE,init},pos)) = 
-			(venv, tenv, []) (*COMPLETAR*)
-		| trdec (venv,tenv) (VarDec ({name,escape,typ=SOME s,init},pos)) =
-			(venv, tenv, []) (*COMPLETAR*)
-		| trdec (venv,tenv) (FunctionDec fs) =
+		and trvar(SimpleVar s, nl) = (case tabBusca(s,venv) of
+		                              NONE => error(msg3(s),nl)
+									  | SOME (Var {ty=t}) => {exp=SCAF,ty=t}
+									  | SOME _ => error(s ^ "no es una variable simple",nl))
+
+
+		| trvar(FieldVar(v, s), nl) = (case trvar(v,nl) of
+		                                {ty=(TRecord (tyl,_)),...} => let val tyl2 = map (fn (x,y,_) => (x,y)) tyl
+		                                                              in (case searchList(tyl2,s) of
+									                                       NONE => error(msg3(s),nl)
+										                                   |SOME typ  => {exp = SCAF,ty=(!typ)})
+								                                       end
+								        |_ => error(s ^ "no es campo de un record definido",nl))
+
+		| trvar(SubscriptVar(v, e), nl) = (case trvar(v,nl) of
+		                                 {ty=TArray (typ,_),...} => let val {ty=t,...} = trexp e
+										                            in if tiposIguales t (TInt RW) then {exp=SCAF,ty=(!typ)}
+																       else error("La expresion no es de into int",nl)
+																    end
+										 |_ => error("La variable no es de tipo Array",nl))
+
+		and trdec (venv, tenv) (VarDec ({name,escape,typ=NONE,init},pos)) = let val {ty=t,...} = trexp init
+		                                                                        val venv' = tabRInserta(name,Var {ty=t},venv)
+																		    in (venv',tenv,[])
+																			end
+
+		| trdec (venv,tenv) (VarDec ({name,escape,typ=SOME s,init},pos)) = let val {ty=t,...} = trexp init
+		                                                                   in (case tabBusca(s,tenv) of
+																		        NONE => error("El tipo " ^ s ^ " no existe",pos)
+																				|SOME t2 => if t = t2 then let val venv' = tabRInserta(name,Var {ty=t},venv)
+																		                                   in (venv',tenv,[])
+																			    			               end
+
+																		                     else error("El tipo de " ^ s ^ " no coincide con el de la expresion",pos))
+																		   end
+
+		| trdec (venv,tenv) (FunctionDec fs) =  if checkDuplicates (map (fn reg => #name reg)) then error()
+											    else let  val funList  = map funtr fs
 			(venv, tenv, []) (*COMPLETAR*)
 		| trdec (venv,tenv) (TypeDec ts) =
 			(venv, tenv, []) (*COMPLETAR*)
