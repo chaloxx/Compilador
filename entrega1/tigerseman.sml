@@ -56,24 +56,44 @@ fun searchList([],_) = NONE
 	                             else searchList (xs,s)
 
 
-fun trfun dec tenv = let val typs = map (trparams tenv) (#params dec)
-                     in
-               {level = mainLevel, label = #name dec,formals = typs}
+(*Tratar parámetros*)
+
+(*fun trparam error nl tenv (p:field) = let val res = #typ p
+															        in (case res  of
+															             NameTy s => (case tabBusca(s,tenv) of
+															                           NONE => error(s^ " no es un tipo",nl)
+															 									      	 |SOME t => t)
+															 			       |_ => error("No es un NameTy",nl))
+															        end
 
 
 
-fun trparams tenv p = case #typ p of
-                       NameTy s => (case tabBusca(s,tenv) of
-					                 NONE => error(s^ " no es un tipo",nl)
-									 SOME t => t
-				       |_ => error("No es un NameTy",nl)
-
-{name: symbol, params: field list,
-		result: symbol option, body: exp} * pos)
 
 
-{level: unit, label: tigertemp.label, (*level le damos mainLevel por ahora y label un string*)
-	formals: Tipo list, result: Tipo, extern: bool}
+(*Tratar declaración de función*)
+fun trfun error tenv dec = let  val (r,nl) = dec
+                                val typs = map (trparam error nl tenv) (#params r)
+                           in (case  #result r of
+													      NONE => Func {level = mainLevel, label = #name r,formals = typs, result = TUnit, extern = false}
+				  						          | SOME s => (case tabBusca(s,tenv) of
+												                      NONE => error(s ^" no es un tipo",nl)
+																              |SOME t  => Func {level = mainLevel, label = #name r,formals = typs, result = t, extern = false}))
+                           end
+
+													(*) {level: unit, label: tigertemp.label, (*level le damos mainLevel por ahora y label un string*)
+													 	formals: Tipo list, result: Tipo, extern: bool}*)
+*)
+
+fun checkDuplicates ys = let fun aux  rs [] = NONE
+                              | aux rs ((h:string*int)::hs) = (case List.find (fn x => x = #1 h) rs of
+															                                    NONE => aux ((#1 h)::rs) hs
+																										            | SOME_ => SOME h)
+												 in aux [] ys
+												 end
+
+
+
+
 
 
 fun transExp(venv, tenv) =
@@ -235,11 +255,36 @@ fun transExp(venv, tenv) =
 																		                     else error("El tipo de " ^ s ^ " no coincide con el de la expresion",pos))
 																		   end
 
-		| trdec (venv,tenv) (FunctionDec fs) =  if checkDuplicates (map (fn reg => #name reg)) then error()
-											    else let  val funList  = map funtr fs
-			(venv, tenv, []) (*COMPLETAR*)
+		| trdec (venv,tenv) (FunctionDec fs) =  let val np = map (fn (reg,pos) => (#name reg,pos)) fs
+		                                        in (case checkDuplicates np of
+																						     NONE => error("basura",1) (*let  val funList  = map (trfun error tenv) fs
+																								               val venv2 =
+																								          in*)
+																								 |SOME (f,p) => error(f^" ya está declarada en este batch",p))
+																						end
+			(*)(venv, tenv, []) (*COMPLETAR*)*)
 		| trdec (venv,tenv) (TypeDec ts) =
 			(venv, tenv, []) (*COMPLETAR*)
+
+		and trfun error (tenv: (symbol,Tipo) Tabla)  dec = let  val (r,nl) = dec
+		                                                        val typs = map (trparam error nl tenv) (#params r)
+		                                                   in (case  #result r of
+															                  NONE => Func {level = mainLevel, label = #name r,formals = [TUnit], result = TUnit, extern = false}
+						  						          | SOME s => (case tabBusca(s,tenv) of
+														                      NONE => error(s ^" no es un tipo",nl)
+																		              |SOME t  => Func {level = mainLevel, label = #name r,formals = [TUnit], result = t, extern = false}))
+		                           end
+
+
+
+     and trparam error nl tenv (p:field) = let val res = #typ p
+		 		  													        in (case res  of
+		 			  												             NameTy s => (case tabBusca(s,tenv) of
+		 				     										                           NONE => error(s^ " no es un tipo",nl)
+		 					  										 									      	 |SOME t => t)
+		 						   									 			       |_ => error("No es un NameTy",nl))
+		 							  								        end
+
 	in trexp end
 fun transProg ex =
 	let	val main =
