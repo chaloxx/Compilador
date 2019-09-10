@@ -56,33 +56,13 @@ fun searchList([],_) = NONE
 	                             else searchList (xs,s)
 
 
-(*Tratar parámetros*)
-
-(*fun trparam error nl tenv (p:field) = let val res = #typ p
-															        in (case res  of
-															             NameTy s => (case tabBusca(s,tenv) of
-															                           NONE => error(s^ " no es un tipo",nl)
-															 									      	 |SOME t => t)
-															 			       |_ => error("No es un NameTy",nl))
-															        end
 
 
+fun zip [] _  = []
+    | zip _ [] = []
+    | zip (x::xs) (y::ys) = ((x,y)::(zip xs ys))
 
 
-
-(*Tratar declaración de función*)
-fun trfun error tenv dec = let  val (r,nl) = dec
-                                val typs = map (trparam error nl tenv) (#params r)
-                           in (case  #result r of
-													      NONE => Func {level = mainLevel, label = #name r,formals = typs, result = TUnit, extern = false}
-				  						          | SOME s => (case tabBusca(s,tenv) of
-												                      NONE => error(s ^" no es un tipo",nl)
-																              |SOME t  => Func {level = mainLevel, label = #name r,formals = typs, result = t, extern = false}))
-                           end
-
-													(*) {level: unit, label: tigertemp.label, (*level le damos mainLevel por ahora y label un string*)
-													 	formals: Tipo list, result: Tipo, extern: bool}*)
-*)
 
 fun checkDuplicates ys = let fun aux  rs [] = NONE
                               | aux rs ((h:string*int)::hs) = (case List.find (fn x => x = #1 h) rs of
@@ -92,7 +72,17 @@ fun checkDuplicates ys = let fun aux  rs [] = NONE
 												 end
 
 
-
+(*
+fn aux r venv tenv = let val name = #name r
+                         val nameParams = map #name (#params r)
+												 val typsParams = (case tabBusca name venv of
+												                     NONE => error ("Cualquier cosa",1)
+																						 |SOME (Func f) => #formals f)
+												val ntParams = zip nameParams typsParams
+												val venv' = List.fold (fn (s,t) => tabRInserta(s,Var {ty=t},venv)) venv ntParams
+										 in (transExp (venv',tenv)) (#body r)
+										 end
+*)
 
 
 
@@ -101,6 +91,8 @@ fun transExp(venv, tenv) =
             fun msg1(f) = "Los tipos de los argumentos de " ^ f ^ " no coinciden con los tipos de sus parámetros"
             fun msg2(f) = f ^ " no es una función"
             fun msg3(f) = f ^ " no está definida"
+						fun msg4(v) = "El tipo de la variable " ^ v ^ " no coincide con el de la expresión"
+						fun msg5(v) = v ^ " no es una variable"
 		fun trexp(VarExp v) = trvar(v)
 		| trexp(UnitExp _) = {exp=SCAF, ty=TUnit}
 		| trexp(NilExp _)= {exp=SCAF, ty=TNil}
@@ -178,8 +170,14 @@ fun transExp(venv, tenv) =
 				val exprs = map (fn{exp, ty} => exp) lexti
 				val {exp, ty=tipo} = hd(rev lexti)
 			in	{ exp=SCAF, ty=tipo } end
-		| trexp(AssignExp({var=SimpleVar s, exp}, nl)) =
-			{exp=SCAF, ty=TUnit} (*COMPLETAR*)
+		| trexp(AssignExp({var=SimpleVar s, exp}, nl)) = (case tabBusca(s,venv) of
+		                                                  NONE => error(msg3(s),nl)
+																											|SOME (Var {ty=t}) => let val {ty=t2,...} = trexp exp
+																											                      in if tiposIguales t t2 then {exp=SCAF, ty=TUnit}
+																																               else error(msg4(s),nl)
+																																				  end
+																											| SOME _ => error(msg5(s),nl))
+
 		| trexp(AssignExp({var, exp}, nl)) =
 			{exp=SCAF, ty=TUnit} (*COMPLETAR*)
 		| trexp(IfExp({test, then', else'=SOME else'}, nl)) =
@@ -257,33 +255,47 @@ fun transExp(venv, tenv) =
 
 		| trdec (venv,tenv) (FunctionDec fs) =  let val np = map (fn (reg,pos) => (#name reg,pos)) fs
 		                                        in (case checkDuplicates np of
-																						     NONE => error("basura",1) (*let  val funList  = map (trfun error tenv) fs
-																								               val venv2 =
-																								          in*)
-																								 |SOME (f,p) => error(f^" ya está declarada en este batch",p))
+																						     NONE => let  val funList  = map (trfun tenv) fs
+																								              val names = map (fn (n,_) => n) np
+																															val funcsEntry = zip names funList
+																															val venv' = List.foldl (fn ((s,f),e) => tabRInserta(s,f,e)) venv funcsEntry
+																															val _ = map (fn (r,_) => trexpBody r venv' tenv) fs
+																								         in (venv',tenv,[])
+																												 end
+																								|SOME (f,p) => error(f^" ya está declarada en este batch",p))
 																						end
-			(*)(venv, tenv, []) (*COMPLETAR*)*)
 		| trdec (venv,tenv) (TypeDec ts) =
 			(venv, tenv, []) (*COMPLETAR*)
 
-		and trfun error (tenv: (symbol,Tipo) Tabla)  dec = let  val (r,nl) = dec
-		                                                        val typs = map (trparam error nl tenv) (#params r)
-		                                                   in (case  #result r of
-															                  NONE => Func {level = mainLevel, label = #name r,formals = [TUnit], result = TUnit, extern = false}
-						  						          | SOME s => (case tabBusca(s,tenv) of
-														                      NONE => error(s ^" no es un tipo",nl)
-																		              |SOME t  => Func {level = mainLevel, label = #name r,formals = [TUnit], result = t, extern = false}))
-		                           end
+		and   trfun tenv  dec = let  val (r,nl) = dec
+		                             val (prueba : Tipo list) = map (trparam nl tenv) (#params r)
+		                        in (case  #result r of
+									                NONE => Func {level = mainLevel, label = #name r,formals = prueba, result = TUnit, extern = false}
+							                   | SOME s => (case tabBusca(s,tenv) of
+								                               NONE => error(s ^" no es un tipo",nl)
+					   						                       |SOME t  => Func {level = mainLevel, label = #name r,formals = prueba, result = t, extern = false} ))
+		                        end
 
 
 
-     and trparam error nl tenv (p:field) = let val res = #typ p
-		 		  													        in (case res  of
-		 			  												             NameTy s => (case tabBusca(s,tenv) of
-		 				     										                           NONE => error(s^ " no es un tipo",nl)
-		 					  										 									      	 |SOME t => t)
-		 						   									 			       |_ => error("No es un NameTy",nl))
-		 							  								        end
+  and trparam nl tenv p = (case #typ p  of
+		 			  								NameTy s => (case tabBusca(s,tenv) of
+		 				     						               NONE => error(s^ " no es un tipo",nl)
+		 					  									        |SOME t => t)
+		 						   		      |_ => error("No es un NameTy",nl))
+
+  and trexpBody r venv tenv = let val name = #name r
+			                            val nameParams = map #name (#params r)
+         												  val typsParams = (case tabBusca(name,venv) of
+					    										                     NONE => raise Fail "Basura"
+							    																		 |SOME (Func f) => #formals f
+																											 | SOME _ => raise Fail "Basura")
+									    						val ntParams = zip nameParams typsParams
+											    				val venv' = List.foldl (fn ((s,t),v) => tabRInserta(s,Var {ty=t},v)) venv ntParams
+													    in (transExp (venv',tenv)) (#body r)
+													    end
+
+
 
 	in trexp end
 fun transProg ex =
