@@ -72,18 +72,6 @@ fun checkDuplicates ys = let fun aux  rs [] = NONE
 												 end
 
 
-(*
-fn aux r venv tenv = let val name = #name r
-                         val nameParams = map #name (#params r)
-												 val typsParams = (case tabBusca name venv of
-												                     NONE => error ("Cualquier cosa",1)
-																						 |SOME (Func f) => #formals f)
-												val ntParams = zip nameParams typsParams
-												val venv' = List.fold (fn (s,t) => tabRInserta(s,Var {ty=t},venv)) venv ntParams
-										 in (transExp (venv',tenv)) (#body r)
-										 end
-*)
-
 
 
 fun transExp(venv, tenv) =
@@ -91,8 +79,12 @@ fun transExp(venv, tenv) =
             fun msg1(f) = "Los tipos de los argumentos de " ^ f ^ " no coinciden con los tipos de sus parámetros"
             fun msg2(f) = f ^ " no es una función"
             fun msg3(f) = f ^ " no está definida"
-						fun msg4(v) = "El tipo de la variable " ^ v ^ " no coincide con el de la expresión"
+						val msg4 = "El tipo de la variable no coincide con el de la expresión"
 						fun msg5(v) = v ^ " no es una variable"
+						fun msg6(v) = "El tipo " ^ v ^ " no está definido"
+						val msg7 = "Los tipos no coindicen"
+						val msg8 = "El tamaño debe tener tipo entero"
+						fun msg9(s) = s ^ " no es un arreglo"
 		fun trexp(VarExp v) = trvar(v)
 		| trexp(UnitExp _) = {exp=SCAF, ty=TUnit}
 		| trexp(NilExp _)= {exp=SCAF, ty=TNil}
@@ -170,16 +162,21 @@ fun transExp(venv, tenv) =
 				val exprs = map (fn{exp, ty} => exp) lexti
 				val {exp, ty=tipo} = hd(rev lexti)
 			in	{ exp=SCAF, ty=tipo } end
-		| trexp(AssignExp({var=SimpleVar s, exp}, nl)) = (case tabBusca(s,venv) of
+		(*| trexp(AssignExp({var=SimpleVar s, exp}, nl)) = (case tabBusca(s,venv) of
 		                                                  NONE => error(msg3(s),nl)
 																											|SOME (Var {ty=t}) => let val {ty=t2,...} = trexp exp
 																											                      in if tiposIguales t t2 then {exp=SCAF, ty=TUnit}
 																																               else error(msg4(s),nl)
 																																				  end
-																											| SOME _ => error(msg5(s),nl))
+																											| SOME _ => error(msg5(s),nl))*)
 
-		| trexp(AssignExp({var, exp}, nl)) =
-			{exp=SCAF, ty=TUnit} (*COMPLETAR*)
+		| trexp(AssignExp({var, exp}, nl)) = let val {ty=t,...} = trvar(var,nl)
+                                             val {ty=t2,...} = trexp(exp)
+																				 in if tiposIguales t t2 then  {exp=SCAF, ty=TUnit}
+																				    else error(msg4,nl)
+																				 end
+
+
 		| trexp(IfExp({test, then', else'=SOME else'}, nl)) =
 			let val {exp=testexp, ty=tytest} = trexp test
 			    val {exp=thenexp, ty=tythen} = trexp then'
@@ -204,7 +201,11 @@ fun transExp(venv, tenv) =
 				else if (#ty ttest) <> TInt RW then error("Error de tipo en la condición", nl)
 				else error("El cuerpo de un while no puede devolver un valor", nl)
 			end
-		| trexp(ForExp({var, escape, lo, hi, body}, nl)) =
+		| trexp(ForExp({var, escape, lo, hi, body}, nl)) = (*let  val {exp=explo,ty=tylo} = trexp lo
+		                                                        val {exp=exphi,ty=tyhi} = trexp hi
+																														(*val _ = preForWhile()*)
+																														val venv' = tabInserta(var,TInt RO,venv)
+																														val {exp=expbody,ty=tybody} = (transExp (venv',tenv)) body*)
 			{exp=SCAF, ty=TUnit} (*COMPLETAR*)
 		| trexp(LetExp({decs, body}, _)) =
 			let
@@ -215,8 +216,17 @@ fun transExp(venv, tenv) =
 			end
 		| trexp(BreakExp nl) =
 			{exp=SCAF, ty=TUnit} (*COMPLETAR*)
-		| trexp(ArrayExp({typ, size, init}, nl)) =
-			{exp=SCAF, ty=TUnit} (*COMPLETAR*)
+		| trexp(ArrayExp({typ, size, init}, nl)) = (case tabBusca(typ,tenv) of
+		                                             NONE => error(msg6(typ),nl)
+																								 | SOME (TArray (t,_)) => let val {ty=t2,...} = trexp init
+																								                          in if tiposIguales (!t) t2 then let val {ty=ts,...} = trexp size
+																																					                                in if tiposIguales ts (TInt RW) then {exp=SCAF, ty=TUnit}
+																																																					   else error(msg8,nl)
+																																																					end
+																																						 else error(msg7,nl)
+																																					end
+																								| SOME _ => error(msg9(typ),nl))
+
 		and trvar(SimpleVar s, nl) = (case tabBusca(s,venv) of
 		                              NONE => error(msg3(s),nl)
 									  | SOME (Var {ty=t}) => {exp=SCAF,ty=t}
