@@ -4,6 +4,7 @@ struct
 open tigerabs
 open tigersres
 open tigertrans
+open tigertopsort
 
 type expty = {exp: exp, ty: Tipo}
 
@@ -79,12 +80,14 @@ fun transExp(venv, tenv) =
             fun msg1(f) = "Los tipos de los argumentos de " ^ f ^ " no coinciden con los tipos de sus parámetros"
             fun msg2(f) = f ^ " no es una función"
             fun msg3(f) = f ^ " no está definida"
-						val msg4 = "El tipo de la variable no coincide con el de la expresión"
-						fun msg5(v) = v ^ " no es una variable"
-						fun msg6(v) = "El tipo " ^ v ^ " no está definido"
-						val msg7 = "Los tipos no coindicen"
-						val msg8 = "El tamaño debe tener tipo entero"
-						fun msg9(s) = s ^ " no es un arreglo"
+            val msg4 = "El tipo de la variable no coincide con el de la expresión"
+            fun msg5(v) = v ^ " no es una variable"
+            fun msg6(v) = "El tipo " ^ v ^ " no está definido"
+            val msg7 = "Los tipos no coindicen"
+            val msg8 = "El tamaño debe tener tipo entero"
+            fun msg9(s) = s ^ " no es un arreglo"
+			val msg10 = "Los límites del for deben ser enteros"
+			val msg11 = "No puede haber una asignación a una variable de solo lectura"
 		fun trexp(VarExp v) = trvar(v)
 		| trexp(UnitExp _) = {exp=SCAF, ty=TUnit}
 		| trexp(NilExp _)= {exp=SCAF, ty=TNil}
@@ -161,20 +164,17 @@ fun transExp(venv, tenv) =
 			let	val lexti = map trexp s
 				val exprs = map (fn{exp, ty} => exp) lexti
 				val {exp, ty=tipo} = hd(rev lexti)
-			in	{ exp=SCAF, ty=tipo } end
-		(*| trexp(AssignExp({var=SimpleVar s, exp}, nl)) = (case tabBusca(s,venv) of
-		                                                  NONE => error(msg3(s),nl)
-																											|SOME (Var {ty=t}) => let val {ty=t2,...} = trexp exp
-																											                      in if tiposIguales t t2 then {exp=SCAF, ty=TUnit}
-																																               else error(msg4(s),nl)
-																																				  end
-																											| SOME _ => error(msg5(s),nl))*)
+			in	{ exp=SCAF, ty=tipo }
+		    end
 
-		| trexp(AssignExp({var, exp}, nl)) = let val {ty=t,...} = trvar(var,nl)
-                                             val {ty=t2,...} = trexp(exp)
-																				 in if tiposIguales t t2 then  {exp=SCAF, ty=TUnit}
-																				    else error(msg4,nl)
-																				 end
+		| trexp(AssignExp({var, exp}, nl)) = let val {ty=res,...} = trvar(var,nl)
+		                                     in (case res of
+											      (TInt RO) => error(msg11,nl)
+												  | t => let val {ty=t2,...} = trexp (exp)
+											             in if tiposIguales t t2 then  {exp=SCAF, ty=TUnit}
+												            else error(msg4,nl)
+														 end)
+											 end
 
 
 		| trexp(IfExp({test, then', else'=SOME else'}, nl)) =
@@ -201,12 +201,16 @@ fun transExp(venv, tenv) =
 				else if (#ty ttest) <> TInt RW then error("Error de tipo en la condición", nl)
 				else error("El cuerpo de un while no puede devolver un valor", nl)
 			end
-		| trexp(ForExp({var, escape, lo, hi, body}, nl)) = (*let  val {exp=explo,ty=tylo} = trexp lo
-		                                                        val {exp=exphi,ty=tyhi} = trexp hi
-																														(*val _ = preForWhile()*)
-																														val venv' = tabInserta(var,TInt RO,venv)
-																														val {exp=expbody,ty=tybody} = (transExp (venv',tenv)) body*)
-			{exp=SCAF, ty=TUnit} (*COMPLETAR*)
+		| trexp(ForExp({var, escape, lo, hi, body}, nl)) =
+		    let  val {exp=explo,ty=tylo} = trexp lo
+                 val {exp=exphi,ty=tyhi} = trexp hi
+            in if (tiposIguales tylo (TInt RO)) andalso (tiposIguales tyhi (TInt RO))
+               then  let val venv' = tabInserta(var,Var {ty=TInt RO},venv)
+                         val {exp=expbody,ty=tybody} = (transExp (venv',tenv)) body
+			     	  in {exp=SCAF,ty=TUnit}
+                     end
+			   else error(msg10,nl)
+            end
 		| trexp(LetExp({decs, body}, _)) =
 			let
 				val (venv', tenv', _) = List.foldl (fn (d, (v, t, _)) => trdec(v, t) d) (venv, tenv, []) decs
@@ -214,18 +218,17 @@ fun transExp(venv, tenv) =
 			in
 				{exp=SCAF, ty=tybody}
 			end
-		| trexp(BreakExp nl) =
-			{exp=SCAF, ty=TUnit} (*COMPLETAR*)
+		| trexp(BreakExp nl) = {exp=SCAF, ty=TUnit}
 		| trexp(ArrayExp({typ, size, init}, nl)) = (case tabBusca(typ,tenv) of
 		                                             NONE => error(msg6(typ),nl)
-																								 | SOME (TArray (t,_)) => let val {ty=t2,...} = trexp init
-																								                          in if tiposIguales (!t) t2 then let val {ty=ts,...} = trexp size
-																																					                                in if tiposIguales ts (TInt RW) then {exp=SCAF, ty=TUnit}
-																																																					   else error(msg8,nl)
-																																																					end
-																																						 else error(msg7,nl)
-																																					end
-																								| SOME _ => error(msg9(typ),nl))
+													| SOME (TArray (t,_)) => let val {ty=t2,...} = trexp init
+																             in if tiposIguales (!t) t2 then let val {ty=ts,...} = trexp size
+																						                     in if tiposIguales ts (TInt RW) then {exp=SCAF, ty=TUnit}
+																											    else error(msg8,nl)
+																											 end
+																				else error(msg7,nl)
+																			 end
+												    | SOME _ => error(msg9(typ),nl))
 
 		and trvar(SimpleVar s, nl) = (case tabBusca(s,venv) of
 		                              NONE => error(msg3(s),nl)
@@ -265,17 +268,20 @@ fun transExp(venv, tenv) =
 
 		| trdec (venv,tenv) (FunctionDec fs) =  let val np = map (fn (reg,pos) => (#name reg,pos)) fs
 		                                        in (case checkDuplicates np of
-																						     NONE => let  val funList  = map (trfun tenv) fs
-																								              val names = map (fn (n,_) => n) np
-																															val funcsEntry = zip names funList
-																															val venv' = List.foldl (fn ((s,f),e) => tabRInserta(s,f,e)) venv funcsEntry
-																															val _ = map (fn (r,_) => trexpBody r venv' tenv) fs
-																								         in (venv',tenv,[])
-																												 end
-																								|SOME (f,p) => error(f^" ya está declarada en este batch",p))
-																						end
-		| trdec (venv,tenv) (TypeDec ts) =
-			(venv, tenv, []) (*COMPLETAR*)
+														NONE => let  val funList  = map (trfun tenv) fs
+																	 val names = map (fn (n,_) => n) np
+																     val funcsEntry = zip names funList
+																     val venv' = List.foldl (fn ((s,f),e) => tabRInserta(s,f,e)) venv funcsEntry
+																	 val _ = map (fn (r,_) => trexpBody r venv' tenv) fs
+																 in (venv',tenv,[])
+																end
+														|SOME (f,p) => error(f^" ya está declarada en este batch",p))
+												end
+
+		| trdec (venv,tenv) (TypeDec ts) = let val ts' = map (fn (r,_) => r) ts
+		                                   in (venv,fijaTipos ts' tenv,[])
+										   end
+
 
 		and   trfun tenv  dec = let  val (r,nl) = dec
 		                             val (prueba : Tipo list) = map (trparam nl tenv) (#params r)
