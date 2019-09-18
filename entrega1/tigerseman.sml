@@ -256,9 +256,11 @@ fun transExp(venv, tenv) =
 
 		and trdec (venv, tenv) (VarDec ({name,escape,typ=NONE,init},pos)) =
 		                                   let val {ty=t,...} = (transExp (venv,tenv)) init
-		                                       val venv' = tabRInserta(name,Var {ty=t},venv)
-																		    in (venv',tenv,[])
-																			end
+										   in if tiposIguales t TNil then error("Nil no puede ser asignado en variables que no tenga un tipo record",pos)
+										      else let val venv' = tabRInserta(name,Var {ty=t},venv)
+												   in (venv',tenv,[])
+												   end
+										   end
 
 		| trdec (venv,tenv) (VarDec ({name,escape,typ=SOME s,init},pos)) = let val {ty=t,...} = transExp (venv,tenv) init
 		                                                                   in (case tabBusca(s,tenv) of
@@ -276,7 +278,7 @@ fun transExp(venv, tenv) =
 																	 val names = map (fn (n,_) => n) np
 																     val funcsEntry = zip names funList
 																     val venv' = List.foldl (fn ((s,f),e) => tabRInserta(s,f,e)) venv funcsEntry
-																	 val _ = map (fn (r,_) => trexpBody r venv' tenv) fs
+																	 val _ = map (fn (r,nl) => trexpBody r venv' tenv nl) fs
 																 in (venv',tenv,[])
 																end
 														|SOME (f,p) => error(msg12(f),p))
@@ -307,16 +309,24 @@ fun transExp(venv, tenv) =
 		 					  									        |SOME t => t)
 		 						   		      |_ => error("No es un NameTy",nl))
 
-  and trexpBody r venv tenv = let val name = #name r
-			                            val nameParams = map #name (#params r)
-         												  val typsParams = (case tabBusca(name,venv) of
-					    										                     NONE => raise Fail "Basura"
-							    																		 |SOME (Func f) => #formals f
-																											 | SOME _ => raise Fail "Basura")
-									    						val ntParams = zip nameParams typsParams
-											    				val venv' = List.foldl (fn ((s,t),v) => tabRInserta(s,Var {ty=t},v)) venv ntParams
-													    in (transExp (venv',tenv)) (#body r)
-													    end
+  and trexpBody r venv tenv nl = let val name = #name r
+			                         val nameParams = map #name (#params r)
+         						     val typsParams = (case tabBusca(name,venv) of
+					    					                     NONE => raise Fail "Basura"
+							    								 |SOME (Func f) => #formals f
+										    					 | SOME _ => raise Fail "Basura")
+								     val ntParams = zip nameParams typsParams
+									 val venv' = List.foldl (fn ((s,t),v) => tabRInserta(s,Var {ty=t},v)) venv ntParams
+									 val res = (transExp (venv',tenv)) (#body r)
+                                     val tyRes = #ty res
+						    in (case #result r of
+							    NONE => if tiposIguales tyRes TUnit then res
+								        else error(name ^ " es un procedimiento y no puede retornar un valor",nl)
+							    |SOME s => (case tabBusca(s,tenv) of
+								             NONE => error("El tipo del valor de retorno de " ^ name ^ " no es válido",nl)
+											 |SOME t => if tiposIguales t tyRes then res
+											           else error("El valor de retorno de " ^name^ " debe se de tipo " ^ s,nl ) ))
+						    end
 
 
 
