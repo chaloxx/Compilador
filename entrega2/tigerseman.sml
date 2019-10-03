@@ -14,10 +14,16 @@ val tab_tipos : (string, Tipo) Tabla = tabInserList(
 	tabNueva(),
 	[("int", TInt RW), ("string", TString)])
 
-val levelPila: tigertrans.level tigerpila.Pila = tigerpila.nuevaPila1(tigertrans.outermost)
-fun pushLevel l = tigerpila.pushPila levelPila l
-fun popLevel() = tigerpila.popPila levelPila
-fun topLevel() = tigerpila.topPila levelPila
+(*Modificamos la pila para almacenar los nombres de las funciones*)
+val namePila: string  tigerpila.Pila = tigerpila.nuevaPila()
+fun pushName l = tigerpila.pushPila namePila l
+fun popName() = tigerpila.popPila namePila
+fun topName() = tigerpila.topPila namePila
+
+
+fun searchLevel()
+
+
 
 val tab_vars : (string, EnvEntry) Tabla = tabInserList(
 	tabNueva(),
@@ -251,7 +257,12 @@ fun transExp(venv, tenv) =
 				let  val {exp=explo,ty=tylo} = trexp lo
 					 val {exp=exphi,ty=tyhi} = trexp hi
 				in if (tiposIguales tylo (TInt RO)) andalso (tiposIguales tyhi (TInt RO))
-				   then  let val venv' = tabInserta(var,Var {ty=TInt RO},venv)
+				   then  let val name = topName()
+				             val frame = (case tabBusca(name,venv) of
+							               SOME (Func f) => #frame (#level f)
+										  | _ => raise Fail "Esto no debería pasar")
+				             val access' = allocLocal (frame) (!escape)
+				             val venv' = tabInserta(var,Var {ty=TInt RO, level = getActualLev(), access = access' },venv)
 							 val {exp=expbody,ty=tybody} = (transExp (venv',tenv)) body
 						in {exp=SCAF,ty=TUnit}
 						 end
@@ -361,6 +372,7 @@ fun transExp(venv, tenv) =
 		 						   		      |_ => error("No es un NameTy",nl))
 
   and trexpBody r venv tenv nl = let val name = #name r
+                                     val _ = pushName name (*Agregamos el nombre a la pila para poder acceder a su frame*)
 			                         val nameParams = map #name (#params r)
          						     val typsParams = (case tabBusca(name,venv) of
 					    					                     NONE => raise Fail "Basura"
@@ -369,6 +381,7 @@ fun transExp(venv, tenv) =
 								     val ntParams = zip nameParams typsParams
 									 val venv' = List.foldl (fn ((s,t),v) => tabRInserta(s,Var {ty=t},v)) venv ntParams
 									 val res = (transExp (venv',tenv)) (#body r)
+									 val _ = popName() (*Ya analizamos el cuerpo asi que descartamos el nombre*)
                                      val tyRes = #ty res
 						    in (case #result r of
 							    NONE => if tiposIguales tyRes TUnit then res
