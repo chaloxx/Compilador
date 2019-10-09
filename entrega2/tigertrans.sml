@@ -7,9 +7,10 @@ open tigerabs
 
 exception breakexc
 exception divCero
-	
+
 type level = {parent:frame option , frame: frame, level: int}
 type access = tigerframe.access
+
 
 type frag = tigerframe.frag
 val fraglist = ref ([]: frag list)
@@ -99,7 +100,7 @@ in
 	fun topSalida() =
 		case tigerpila.topPila salidas of
 		SOME l => l
-		| NONE => raise Fail "break incorrecto!"			
+		| NONE => raise Fail "break incorrecto!"
 end
 
 val datosGlobs = ref ([]: frag list)
@@ -146,7 +147,7 @@ fun simpleVar(acc, nivel) =
 
 fun varDec(acc) = simpleVar(acc, getActualLev())
 
-fun fieldVar(var, field) = 
+fun fieldVar(var, field) =
 	SCAF (*COMPLETAR*)
 
 fun subscriptVar(arr, ind) =
@@ -174,13 +175,13 @@ in
 	Ex (externalCall("allocArray", [s, i]))
 end
 
-fun callExp (name,external,isproc,lev:level,ls) = 
+fun callExp (name,external,isproc,lev:level,ls) =
 	Ex (CONST 0) (*COMPLETAR*)
 
 fun letExp ([], body) = Ex (unEx body)
  |  letExp (inits, body) = Ex (ESEQ(seq inits,unEx body))
 
-fun breakExp() = 
+fun breakExp() =
 	SCAF (*COMPLETAR*)
 
 fun seqExp ([]:exp list) = Nx (EXP(CONST 0))
@@ -236,7 +237,7 @@ in
 	Nx (MOVE(v,vl))
 end
 
-fun binOpIntExp {left, oper, right} = 
+fun binOpIntExp {left, oper, right} =
 	SCAF (*COMPLETAR*)
 
 fun binOpIntRelExp {left,oper,right} =

@@ -4,6 +4,7 @@ struct
 open tigerabs
 open tigersres
 open tigertrans
+open tigertopsort
 
 type expty = {exp: unit, ty: Tipo}
 
@@ -15,13 +16,26 @@ val tab_tipos : (string, Tipo) Tabla = tabInserList(
 	[("int", TInt RW), ("string", TString)])
 
 (*Modificamos la pila para almacenar los nombres de las funciones*)
-val namePila: string  tigerpila.Pila = tigerpila.nuevaPila()
+(*val namePila: string  tigerpila.Pila = tigerpila.nuevaPila()
 fun pushName l = tigerpila.pushPila namePila l
 fun popName() = tigerpila.popPila namePila
 fun topName() = tigerpila.topPila namePila
 
 
-fun searchLevel()
+val actualLevel : level = (
+
+
+fun topLevel(venv) : level = let
+                                val topName = topName()
+							 in (case tabBusca(name,venv) of
+   						         SOME (Func f) => #level f
+   							     | _ => raise Fail "Esto no debería pasar")*)
+
+
+val levelPila: tigertrans.level tigerpila.Pila = tigerpila.nuevaPila1(tigertrans.outermost)
+fun pushLevel l = tigerpila.pushPila levelPila l
+fun popLevel()  = tigerpila.popPila levelPila
+fun topLevel() : tigertrans.level  = tigerpila.topPila levelPila
 
 
 
@@ -83,6 +97,7 @@ fun tiposIguales (TRecord _) TNil = true
       | tiposIgualesList ([],y::ys) = false
 
 (*Agregamos*)
+  (**)
   fun searchList([],_) = NONE
       | searchList((s2,x)::xs,s) = if s = s2 then SOME x
   	                             else searchList (xs,s)
@@ -257,12 +272,9 @@ fun transExp(venv, tenv) =
 				let  val {exp=explo,ty=tylo} = trexp lo
 					 val {exp=exphi,ty=tyhi} = trexp hi
 				in if (tiposIguales tylo (TInt RO)) andalso (tiposIguales tyhi (TInt RO))
-				   then  let val name = topName()
-				             val frame = (case tabBusca(name,venv) of
-							               SOME (Func f) => #frame (#level f)
-										  | _ => raise Fail "Esto no debería pasar")
-				             val access' = allocLocal (frame) (!escape)
-				             val venv' = tabInserta(var,Var {ty=TInt RO, level = getActualLev(), access = access' },venv)
+				   then  let val lvl = topLevel()
+				             val access' = allocLocal (lvl) (!escape)
+				             val venv' = tabInserta(var,Var {ty=TInt RO, level = #level lvl, access = access' },venv)
 							 val {exp=expbody,ty=tybody} = (transExp (venv',tenv)) body
 						in {exp=SCAF,ty=TUnit}
 						 end
@@ -287,7 +299,7 @@ fun transExp(venv, tenv) =
 		| trexp(ArrayExp({typ, size, init}, nl)) = (case tabBusca(typ,tenv) of
 		                                             NONE => error(msg6(typ),nl)
 													| SOME (TArray (t,_)) => let val {ty=t2,...} = trexp init
-																             in if tiposIguales (!t) t2 then let val {ty=ts,...} = trexp size
+																             in if tiposIguales t t2 then let val {ty=ts,...} = trexp size
 																						                     in if tiposIguales ts (TInt RW) then {exp=SCAF, ty=TUnit}
 																											    else error(msg8,nl)
 																											 end
@@ -297,7 +309,7 @@ fun transExp(venv, tenv) =
 
 		and trvar(SimpleVar s, nl) = (case tabBusca(s,venv) of
 		                              NONE => error(msg3(s),nl)
-									  | SOME (Var {ty=t}) => {exp=SCAF,ty=t}
+									  | SOME (Var reg) => {exp=SCAF,ty= #ty reg}
 									  | SOME _ => error(s ^ "no es una variable simple",nl))
 
 
@@ -305,13 +317,13 @@ fun transExp(venv, tenv) =
 		                                {ty=(TRecord (tyl,_)),...} => let val tyl2 = map (fn (x,y,_) => (x,y)) tyl
 		                                                              in (case searchList(tyl2,s) of
 									                                       NONE => error(msg3(s),nl)
-										                                   |SOME typ  => {exp = SCAF,ty=(!typ)})
+										                                   |SOME typ  => {exp = SCAF,ty=typ})
 								                                       end
 								        |_ => error(s ^ " no es campo de un record definido",nl))
 
 		| trvar(SubscriptVar(v, e), nl) = (case trvar(v,nl) of
 		                                 {ty=TArray (typ,_),...} => let val {ty=t,...} = trexp e
-										                            in if tiposIguales t (TInt RW) then {exp=SCAF,ty=(!typ)}
+										                            in if tiposIguales t (TInt RW) then {exp=SCAF,ty=typ}
 																       else error("La expresion no es de into int",nl)
 																    end
 										 |_ => error("La variable no es de tipo Array",nl))
@@ -319,7 +331,9 @@ fun transExp(venv, tenv) =
 		and trdec (venv, tenv) (VarDec ({name,escape,typ=NONE,init},pos)) =
 		                                   let val {ty=t,...} = (transExp (venv,tenv)) init
 										   in if tiposIguales t TNil then error("Nil no puede ser asignado en variables que no tenga un tipo record",pos)
-										      else let val venv' = tabRInserta(name,Var {ty=t},venv)
+										      else let val lvl = topLevel()
+											           val acc = allocLocal lvl (!escape)
+											           val venv' = tabRInserta(name,Var {ty=t,level=getActualLev(),access=acc},venv)
 												   in (venv',tenv,[])
 												   end
 										   end
@@ -327,7 +341,9 @@ fun transExp(venv, tenv) =
 		| trdec (venv,tenv) (VarDec ({name,escape,typ=SOME s,init},pos)) = let val {ty=t,...} = transExp (venv,tenv) init
 		                                                                   in (case tabBusca(s,tenv) of
 																		        NONE => error("El tipo " ^ s ^ " no existe",pos)
-																				|SOME t2 => if t = t2 then let val venv' = tabRInserta(name,Var {ty=t},venv)
+																				|SOME t2 => if t = t2 then let val lvl = topLevel()
+																				                               val acc = allocLocal lvl (!escape)
+																				                               val venv' = tabRInserta(name,Var {ty=t,level=getActualLev(), access=acc},venv)
 																		                                   in (venv',tenv,[])
 																			    			               end
 
@@ -350,15 +366,15 @@ fun transExp(venv, tenv) =
 		                                   in (case checkDuplicates np of
 																			     SOME (n,p) => error(msg12(n),p)
 																			     | NONE => let val ts' = map (fn (r,_) => r) ts
-																					           in (venv,fijaTipos ts' tenv,[])
+																					       in (venv,fijaTipos ts' tenv,[])
 																							       end)
 		         	                         end
 
 
 		and   trfun tenv  dec = let  val (r,nl) = dec
-		                             val (prueba : Tipo list) = map (trparam nl tenv) (#params r)
+		                             val (res : Tipo list) = map (trparam nl tenv) (#params r)
 		                        in (case  #result r of
-									                NONE => Func {level = mainLevel, label = #name r,formals = prueba, result = TUnit, extern = false}
+									             NONE => Func {level = mainLevel, label = #name r,formals = res, result = TUnit, extern = false}
 							                   | SOME s => (case tabBusca(s,tenv) of
 								                               NONE => error(s ^" no es un tipo",nl)
 					   						                       |SOME t  => Func {level = mainLevel, label = #name r,formals = prueba, result = t, extern = false} ))

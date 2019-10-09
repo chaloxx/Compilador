@@ -3,7 +3,7 @@ signature tigertrans = sig
 exception breakexc
 exception divCero
 
-type level
+type level = {parent:tigerframe.frame option , frame: tigerframe.frame, level: int}
 type access
 type frag = tigerframe.frag
 val outermost : level
@@ -14,7 +14,7 @@ val getActualLev : unit -> int
 val allocArg : level -> bool -> access
 val allocLocal : level -> bool -> access
 
-type exp 
+type exp
 val SCAF: exp
 val procEntryExit : {level: level, body: exp} -> unit
 val getResult : unit -> frag list
