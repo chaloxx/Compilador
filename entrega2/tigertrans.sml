@@ -143,7 +143,11 @@ fun nilExp() = Ex (CONST 0)
 fun intExp i = Ex (CONST i)
 
 fun simpleVar(acc, nivel) =
-	SCAF (*COMPLETAR*)
+	(case acc of
+	  InFrame offset => Ex (MEM (BINOP (PLUS,(MEM (BINOP(PLUS,TEMP "falta completar" ,CONST (nivel*8)))), CONST offset)))
+	  |InReg temp => Ex (TEMP temp)
+	  )
+
 
 fun varDec(acc) = simpleVar(acc, getActualLev())
 
@@ -176,7 +180,7 @@ in
 end
 
 fun callExp (name,external,isproc,lev:level,ls) =
-	Ex (CONST 0) (*COMPLETAR*)
+	let val exps = map unExp ls
 
 fun letExp ([], body) = Ex (unEx body)
  |  letExp (inits, body) = Ex (ESEQ(seq inits,unEx body))

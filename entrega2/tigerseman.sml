@@ -48,30 +48,12 @@ val tab_vars : (string, EnvEntry) Tabla = tabInserList(
 		formals=[TInt RW], result=TUnit, extern=true})
 	])
 
-fun tipoReal (TTipo (s, ref (SOME (t)))) = tipoReal t
-  | tipoReal t = t
 
 fun tiposIguales (TRecord _) TNil = true
   | tiposIguales TNil (TRecord _) = true
   | tiposIguales (TRecord (_, u1)) (TRecord (_, u2 )) = (u1=u2)
   | tiposIguales (TArray (_, u1)) (TArray (_, u2)) = (u1=u2)
   | tiposIguales (TInt _) (TInt _) = true
-  | tiposIguales (TTipo (_, r)) b =
-		let
-			val a = case !r of
-				SOME t => t
-				| NONE => raise Fail "No debería pasar! (1)"
-		in
-			tiposIguales a b
-		end
-  | tiposIguales a (TTipo (_, r)) =
-		let
-			val b = case !r of
-				SOME t => t
-				| NONE => raise Fail "No debería pasar! (2)"
-		in
-			tiposIguales a b
-		end
   | tiposIguales a b = (a=b)
 
 
@@ -139,7 +121,9 @@ fun transExp(venv, tenv) =
                                                SOME (Func reg) => let val t1 = map trexp args
                                                                       val t2 = map (fn x => #ty x) t1
 														              val formals = #formals reg
-                                               in if length t2 = length formals then if tiposIgualesList (t2,#formals reg) then {exp=SCAF, ty= #result reg}
+																	  val res = #result reg
+																	  val exp' = callExp(func,#extern reg,res = TUnit,topLevel(),map #exp t1)
+                                               in if length t2 = length formals then if tiposIgualesList (t2,#formals reg) then {exp=exp', ty= res}
                                                                                      else error (msg1(func),nl)
 												   else error("La cantidad de argumentos no coincide con la cantidad de parámetros",nl)
                                                                  end
@@ -172,21 +156,21 @@ fun transExp(venv, tenv) =
 			in
 				if tiposIguales tyl tyr then
 					case oper of
-						PlusOp => if tipoReal tyl=TInt RW then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt RW} else error("Error de tipos", nl)
-						| MinusOp => if tipoReal tyl=TInt RW then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt RW} else error("Error de tipos", nl)
-						| TimesOp => if tipoReal tyl=TInt RW then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt RW} else error("Error de tipos", nl)
-						| DivideOp => if tipoReal tyl=TInt RW then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt RW} else error("Error de tipos", nl)
-						| LtOp => if tipoReal tyl=TInt RW orelse tipoReal tyl=TString then
-							{exp=if tipoReal tyl=TInt RW then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt RW}
+						PlusOp => if  tyl=TInt RW then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt RW} else error("Error de tipos", nl)
+						| MinusOp => if  tyl=TInt RW then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt RW} else error("Error de tipos", nl)
+						| TimesOp => if  tyl=TInt RW then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt RW} else error("Error de tipos", nl)
+						| DivideOp => if  tyl=TInt RW then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt RW} else error("Error de tipos", nl)
+						| LtOp => if  tyl=TInt RW orelse  tyl=TString then
+							{exp=if  tyl=TInt RW then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt RW}
 							else error("Error de tipos", nl)
-						| LeOp => if tipoReal tyl=TInt RW orelse tipoReal tyl=TString then
-							{exp=if tipoReal tyl=TInt RW then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt RW}
+						| LeOp => if  tyl=TInt RW orelse  tyl=TString then
+							{exp=if  tyl=TInt RW then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt RW}
 							else error("Error de tipos", nl)
-						| GtOp => if tipoReal tyl=TInt RW orelse tipoReal tyl=TString then
-							{exp=if tipoReal tyl=TInt RW then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt RW}
+						| GtOp => if  tyl=TInt RW orelse  tyl=TString then
+							{exp=if  tyl=TInt RW then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt RW}
 							else error("Error de tipos", nl)
-						| GeOp => if tipoReal tyl=TInt RW orelse tipoReal tyl=TString then
-							{exp=if tipoReal tyl=TInt RW then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt RW}
+						| GeOp => if  tyl=TInt RW orelse  tyl=TString then
+							{exp=if  tyl=TInt RW then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt RW}
 							else error("Error de tipos", nl)
 						| _ => raise Fail "No debería pasar! (3)"
 				else error("Error de tipos", nl)
@@ -198,7 +182,7 @@ fun transExp(venv, tenv) =
 
 					(* Buscar el tipo *)
 					val (tyr, cs) = case tabBusca(typ, tenv) of
-						SOME t => (case tipoReal t of
+						SOME t => (case  t of
 							TRecord (cs, u) => (TRecord (cs, u), cs)
 							| _ => error(typ^" no es de tipo record", nl))
 						| NONE => error("Tipo inexistente ("^typ^")", nl)
@@ -236,15 +220,15 @@ fun transExp(venv, tenv) =
 			    val {exp=thenexp, ty=tythen} = trexp then'
 			    val {exp=elseexp, ty=tyelse} = trexp else'
 			in
-				if tipoReal tytest=TInt RW andalso tiposIguales tythen tyelse then
-				{exp=if tipoReal tythen=TUnit then ifThenElseExpUnit {test=testexp,then'=thenexp,else'=elseexp} else ifThenElseExp {test=testexp,then'=thenexp,else'=elseexp}, ty=tythen}
+				if  tytest=TInt RW andalso tiposIguales tythen tyelse then
+				{exp=if  tythen=TUnit then ifThenElseExpUnit {test=testexp,then'=thenexp,else'=elseexp} else ifThenElseExp {test=testexp,then'=thenexp,else'=elseexp}, ty=tythen}
 				else error("Error de tipos en if" ,nl)
 			end
 		| trexp(IfExp({test, then', else'=NONE}, nl)) =
 			let val {exp=exptest,ty=tytest} = trexp test
 			    val {exp=expthen,ty=tythen} = trexp then'
 			in
-				if tipoReal tytest=TInt RW andalso tythen=TUnit then
+				if  tytest=TInt RW andalso tythen=TUnit then
 				{exp=ifThenExp{test=exptest, then'=expthen}, ty=TUnit}
 				else error("Error de tipos en if", nl)
 			end
@@ -253,8 +237,8 @@ fun transExp(venv, tenv) =
 				val ttest = trexp test
 				val tbody = trexp body
 			in
-				if tipoReal (#ty ttest) = TInt RW andalso #ty tbody = TUnit then {exp=whileExp {test=(#exp ttest), body=(#exp tbody), lev=topLevel()}, ty=TUnit}
-				else if tipoReal (#ty ttest) <> TInt RW then error("Error de tipo en la condición", nl)
+				if  (#ty ttest) = TInt RW andalso #ty tbody = TUnit then {exp=whileExp {test=(#exp ttest), body=(#exp tbody), lev=topLevel()}, ty=TUnit}
+				else if  (#ty ttest) <> TInt RW then error("Error de tipo en la condición", nl)
 				else error("El cuerpo de un while no puede devolver un valor", nl)
 			end
 		(*Agregamos*)
@@ -299,7 +283,7 @@ fun transExp(venv, tenv) =
 
 		and trvar(SimpleVar s, nl) = (case tabBusca(s,venv) of
 		                              NONE => error(msg3(s),nl)
-									  | SOME (Var reg) => {exp=SCAF,ty= #ty reg}
+									  | SOME (Var reg) => {exp=simpleVar(#access reg,#level reg),ty= #ty reg}
 									  | SOME _ => error(s ^ "no es una variable simple",nl))
 
 
