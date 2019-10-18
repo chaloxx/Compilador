@@ -180,7 +180,7 @@ in
 end
 
 fun callExp (name,external,isproc,lev:level,ls) =
-	let val exps = map unExp ls
+	SCAF(*let val exps = map unExp ls*)
 
 fun letExp ([], body) = Ex (unEx body)
  |  letExp (inits, body) = Ex (ESEQ(seq inits,unEx body))
@@ -222,30 +222,62 @@ in
 end
 
 fun forExp {lo, hi, var, body} =
-	SCAF (*COMPLETAR*)
+	let val exBody = unNx body
+	    val exLo = unEx lo
+			val exHi = unEx hi
+			val thi = newtemp()
+			val exVar = unEx var
+			val (start,intermedio,fin) = (newlabel(), newlabel(),topSalida())
+	in Nx (seq [MOVE(exVar,exLo),MOVE(TEMP thi,exHi),CJUMP(GT,exVar,TEMP thi,fin,start),
+	            LABEL start,exBody,CJUMP(GE, exVar,TEMP thi,fin,intermedio),
+							LABEL intermedio, MOVE(exVar,BINOP(PLUS,exVar,CONST 1)), JUMP(NAME start,[start]),
+							LABEL fin])
+	end
+
+
 
 fun ifThenExp{test, then'} =
-	SCAF (*COMPLETAR*)
+	let val cf = unCx test
+	    val body = unNx then'
+			val (l1,l2) = (newlabel(),newlabel())
+	in Nx (seq [cf(l1,l2),LABEL l1, body,LABEL l2])
+	end
 
 fun ifThenElseExp {test,then',else'} =
-	SCAF (*COMPLETAR*)
+ let val cf = unCx test
+		 val bodyIf = unEx then'
+		 val bodyElse = unEx else'
+		 val (l1,l2) = (newlabel(),newlabel())
+  in Nx (seq [cf(l1,l2),LABEL l1, bodyIf,LABEL l2,bodyElse])
+  end
 
 fun ifThenElseExpUnit {test,then',else'} =
-	SCAF (*COMPLETAR*)
+	let val cf = unCx test
+		 val bodyIf = unNx then'
+		 val bodyElse = unNx else'
+		 val (l1,l2) = (newlabel(),newlabel())
+	 in Nx (seq [cf(l1,l2),LABEL l1, bodyIf,LABEL l2,bodyElse])
+	 end
 
 fun assignExp{var, exp} =
-let
-	val v = unEx var
-	val vl = unEx exp
-in
-	Nx (MOVE(v,vl))
-end
+	let
+		val v = unEx var
+		val vl = unEx exp
+	in
+		Nx (MOVE(v,vl))
+	end
 
 fun binOpIntExp {left, oper, right} =
-	SCAF (*COMPLETAR*)
+	let val leftExp = unEx left
+	    val rightExp = unEx right
+	in Ex (BINOP(oper,leftExp,rightExp))
+	end
 
 fun binOpIntRelExp {left,oper,right} =
-	SCAF (*COMPLETAR*)
+  let val leftExp = unEx left
+	   	val rightExp = unEx right
+   in Cx (BINOP(oper,leftExp,rightExp))
+	 end
 
 fun binOpStrExp {left,oper,right} =
 	SCAF (*COMPLETAR*)

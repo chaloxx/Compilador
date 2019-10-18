@@ -1,4 +1,4 @@
-structure tigertree =
+ structure tigertree =
 struct
 	datatype exp = CONST of int
 		     | NAME of tigertemp.label
