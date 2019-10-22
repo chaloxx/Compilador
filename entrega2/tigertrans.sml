@@ -41,6 +41,7 @@ fun seq [] = EXP (CONST 0)
 	| seq [s] = s
 	| seq (x::xs) = SEQ (x, seq xs)
 
+
 fun unEx (Ex e) = e
 	| unEx (Nx s) = ESEQ(s, CONST 0)
 	| unEx (Cx cf) =
@@ -248,8 +249,13 @@ fun ifThenElseExp {test,then',else'} =
 		 val bodyIf = unEx then'
 		 val bodyElse = unEx else'
 		 val (l1,l2) = (newlabel(),newlabel())
-  in Nx (seq [cf(l1,l2),LABEL l1, bodyIf,LABEL l2,bodyElse])
+		 val t = newtemp()
+  in Ex (ESEQ(seq [ cf(l1,l2), LABEL l1, MOVE(TEMP t, bodyIf), LABEL l2, MOVE(TEMP t, bodyElse) ], TEMP t))
   end
+
+
+
+
 
 fun ifThenElseExpUnit {test,then',else'} =
 	let val cf = unCx test
@@ -267,16 +273,36 @@ fun assignExp{var, exp} =
 		Nx (MOVE(v,vl))
 	end
 
+
+(*Agregamos*)
+fun transOpInt PlusOp = PLUS
+ | transOpInt MinusOp  = MINUS
+ | transOpInt TimesOp = MUL
+ | transOpInt DivideOp  = DIV
+
+(*Agregamos*)
+fun transOpRel EqOp = EQ
+ | transOpRel NeqOp = NE
+ | transOpRel LtOp = LT
+ | transOpRel LeOp = LE
+ | transOpRel GtOp = GT
+ | transOpRel  GeOp = GE
+
+
+
 fun binOpIntExp {left, oper, right} =
 	let val leftExp = unEx left
 	    val rightExp = unEx right
-	in Ex (BINOP(oper,leftExp,rightExp))
+			val oper' = transOpInt oper
+	in Ex (BINOP(oper',leftExp,rightExp))
 	end
 
-fun binOpIntRelExp {left,oper,right} =
-  let val leftExp = unEx left
-	   	val rightExp = unEx right
-   in Cx (BINOP(oper,leftExp,rightExp))
+fun binOpIntRelExp {left, oper, right} =
+  let val oper' = transOpRel oper
+	    val leftExp = unEx left
+			val rightExp = unEx right
+	    val cjump = fn (t,f) => CJUMP (oper',leftExp,rightExp,t,f)
+   in Cx (cjump)
 	 end
 
 fun binOpStrExp {left,oper,right} =
