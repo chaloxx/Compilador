@@ -23,7 +23,7 @@ val outermost: level = {parent=NONE,
 fun newLevel{parent={parent, frame, level}, name, formals} =
 	{
 	parent=SOME frame,
-	frame=newFrame{name=name, formals=formals},
+	frame=newFrame{name=name, formals=(true::formals)},
 	level=level+1}
 fun allocArg{parent, frame, level} b = tigerframe.allocArg frame b
 fun allocLocal{parent, frame, level} b = tigerframe.allocLocal frame b
@@ -143,17 +143,28 @@ fun nilExp() = Ex (CONST 0)
 
 fun intExp i = Ex (CONST i)
 
-fun simpleVar(acc, nivel) =
+
+
+val slOffset = 0
+
+fun  calcularFrame(0,exp) = exp
+     |calcularFrame(salto,exp) = let val exp' = MEM(BINOP(PLUS,exp,CONST slOffset))
+	                                    in calcularFrame(salto-1,exp')
+										end
+
+
+fun simpleVar(fnivel,acc, nivel) =
 	(case acc of
-	  InFrame offset => Ex (MEM (BINOP (PLUS,(MEM (BINOP(PLUS,TEMP "falta completar" ,CONST (nivel*8)))), CONST offset)))
-	  |InReg temp => Ex (TEMP temp)
+		InReg temp => Ex (TEMP temp)
+	   |InFrame offset => let val exp = calcularFrame(fnivel-nivel,TEMP fp)
+	                      in Ex (MEM(BINOP(PLUS,exp, CONST offset)))
+						  end
 	  )
 
 
-fun varDec(acc) = simpleVar(acc, getActualLev())
+fun varDec(acc) = simpleVar(getActualLev(),acc, getActualLev())
 
-fun fieldVar(var, field) =
-	SCAF (*COMPLETAR*)
+fun fieldVar(var, field) = Ex (MEM(BINOP(PLUS,unEx(var),CONST field)))
 
 fun subscriptVar(arr, ind) =
 let
@@ -169,8 +180,17 @@ in
 			BINOP(MUL, TEMP ri, CONST tigerframe.wSz)))))
 end
 
-fun recordExp l =
-	SCAF (*COMPLETAR*)
+
+
+
+fun aux ((_,x),(_,y)) = Int.compare (x,y)
+
+
+fun recordExp l = let val lOrd =  Listsort.sort aux l
+                      val lOrd' = map (fn (x,_) => unEx x) lOrd
+                  in Ex(CALL(NAME "allocRecord",[CONST (length lOrd')] @ lOrd'))
+				  end
+
 
 fun arrayExp{size, init} =
 let
@@ -180,8 +200,24 @@ in
 	Ex (externalCall("allocArray", [s, i]))
 end
 
-fun callExp (name,external,isproc,lev:level,ls) =
-	SCAF(*let val exps = map unExp ls*)
+
+fun calcularSL(calleeLvl,callerLvl,exp) = if callerLvl = calleeLvl then MEM(BINOP(PLUS,exp,CONST slOffset))
+                                          else if callerLvl < calleeLvl then exp
+										       else calcularFrame(callerLvl-calleeLvl,exp)
+
+
+fun callExp (calleeLvl,name,true,isproc,lev:level,ls) = let val exps = map unEx ls
+                                                            val call = CALL(NAME name,exps)
+                                                        in if isproc then  Nx ( EXP call)
+											               else Ex call
+											            end
+   | callExp (calleeLvl,name,false,isproc,lev:level,ls) = let val exps = map unEx ls
+		                                                      val sl = calcularSL(calleeLvl,#level lev,TEMP fp)
+															  val call = CALL(NAME name,(sl::exps))
+														  in if isproc then Nx (EXP call)
+														     else Ex call
+														  end
+
 
 fun letExp ([], body) = Ex (unEx body)
  |  letExp (inits, body) = Ex (ESEQ(seq inits,unEx body))

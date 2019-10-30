@@ -66,7 +66,7 @@ fun tiposIguales (TRecord _) TNil = true
 (*Agregamos*)
   (**)
   fun searchList([],_) = NONE
-      | searchList((s2,x)::xs,s) = if s = s2 then SOME x
+      | searchList((s2,x,y)::xs,s) = if s = s2 then SOME (x,y)
   	                             else searchList (xs,s)
 
 
@@ -122,7 +122,7 @@ fun transExp(venv, tenv) =
                                                                       val t2 = map (fn x => #ty x) t1
 														              val formals = #formals reg
 																	  val res = #result reg
-																	  val exp' = callExp(func,#extern reg,res = TUnit,topLevel(),map #exp t1)
+																	  val exp' = callExp(#level (#level reg),func,#extern reg,res = TUnit,topLevel(),map #exp t1)
                                                in if length t2 = length formals then if tiposIgualesList (t2,#formals reg) then {exp=exp', ty= res}
                                                                                      else error (msg1(func),nl)
 												   else error("La cantidad de argumentos no coincide con la cantidad de parámetros",nl)
@@ -283,16 +283,17 @@ fun transExp(venv, tenv) =
 
 		and trvar(SimpleVar s, nl) = (case tabBusca(s,venv) of
 		                              NONE => error(msg3(s),nl)
-									  | SOME (Var reg) => {exp=simpleVar(#access reg,#level reg),ty= #ty reg}
+									  | SOME (Var reg) => let val lvl = topLevel()
+									                      in {exp=simpleVar(#level lvl,#access reg,#level reg),ty= #ty reg}
+														  end
 									  | SOME _ => error(s ^ "no es una variable simple",nl))
 
 
 		| trvar(FieldVar(v, s), nl) = (case trvar(v,nl) of
-		                                {ty=(TRecord (tyl,_)),...} => let val tyl2 = map (fn (x,y,_) => (x,y)) tyl
-		                                                              in (case searchList(tyl2,s) of
-									                                       NONE => error(msg3(s),nl)
-										                                   |SOME typ  => {exp = SCAF,ty=(!typ)})
-								                                       end
+		                                {ty=(TRecord (tyl,_)),exp = expVar} => (case searchList(tyl,s) of
+										                                            NONE => error(msg3(s),nl)
+											                                        |SOME (typ,pos)  => {exp = fieldVar(expVar,pos),ty=(!typ)})
+
 								        |_ => error(s ^ " no es campo de un record definido",nl))
 
 		| trvar(SubscriptVar(v, e), nl) = (case trvar(v,nl) of
