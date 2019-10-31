@@ -234,10 +234,13 @@ fun transExp(venv, tenv) =
 			end
 		| trexp(WhileExp({test, body}, nl)) =
 			let
+                val _ = preWhileForExp()
 				val ttest = trexp test
 				val tbody = trexp body
+				val expwhile = whileExp {test=(#exp ttest), body=(#exp tbody), lev=topLevel()}
+				val _ = postWhileForExp()
 			in
-				if  (#ty ttest) = TInt RW andalso #ty tbody = TUnit then {exp=whileExp {test=(#exp ttest), body=(#exp tbody), lev=topLevel()}, ty=TUnit}
+				if  (#ty ttest) = TInt RW andalso #ty tbody = TUnit then {exp=expwhile, ty=TUnit}
 				else if  (#ty ttest) <> TInt RW then error("Error de tipo en la condición", nl)
 				else error("El cuerpo de un while no puede devolver un valor", nl)
 			end
@@ -249,8 +252,12 @@ fun transExp(venv, tenv) =
 				   then  let val lvl = topLevel()
 				             val access' = allocLocal (lvl) (!escape)
 				             val venv' = tabInserta(var,Var {ty=TInt RO, level = #level lvl, access = access' },venv)
+							 val {exp = expvar,...} = (transExp(venv',tenv)) (VarExp (SimpleVar var,nl))
+							 val _ = preWhileForExp() (*Agregamos la etiqueta de salida antes de traducir el body*)
 							 val {exp=expbody,ty=tybody} = (transExp (venv',tenv)) body
-						in {exp=SCAF,ty=TUnit}
+							 val transExp = forExp{lo=explo,hi=exphi,var=expvar,body=expbody}
+							 val _ = postWhileForExp (*Descartamos la etiqueta de salida despues de traducir la expresion*)
+						in {exp=transExp,ty=TUnit}
 						 end
 				 else error(msg10,nl)
 				end
@@ -268,7 +275,7 @@ fun transExp(venv, tenv) =
 			in
 				{exp=seqExp(expdecs@[expbody]), ty=tybody}
 			end
-		| trexp(BreakExp nl) = {exp=SCAF, ty=TUnit}
+		| trexp(BreakExp nl) = {exp=breakExp(), ty=TUnit}
 		(*Agregamos todo lo que sigue*)
 		| trexp(ArrayExp({typ, size, init}, nl)) = (case tabBusca(typ,tenv) of
 		                                             NONE => error(msg6(typ),nl)

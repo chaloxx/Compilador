@@ -18,8 +18,7 @@ val fraglist = ref ([]: frag list)
 val actualLevel = ref ~1 (* _tigermain debe tener level = 0. *)
 fun getActualLev() = !actualLevel
 
-val outermost: level = {parent=NONE,
-	frame=newFrame{name="_tigermain", formals=[]}, level=getActualLev()}
+val outermost: level = {parent=NONE, frame=newFrame{name="_tigermain", formals=[]}, level=getActualLev()}
 fun newLevel{parent={parent, frame, level}, name, formals} =
 	{
 	parent=SOME frame,
@@ -183,10 +182,10 @@ end
 
 
 
-fun aux ((_,x),(_,y)) = Int.compare (x,y)
+fun comparar ((_,x),(_,y)) = Int.compare (x,y)
 
 
-fun recordExp l = let val lOrd =  Listsort.sort aux l
+fun recordExp l = let val lOrd =  Listsort.sort comparar l
                       val lOrd' = map (fn (x,_) => unEx x) lOrd
                   in Ex(CALL(NAME "allocRecord",[CONST (length lOrd')] @ lOrd'))
 				  end
@@ -222,8 +221,9 @@ fun callExp (calleeLvl,name,true,isproc,lev:level,ls) = let val exps = map unEx 
 fun letExp ([], body) = Ex (unEx body)
  |  letExp (inits, body) = Ex (ESEQ(seq inits,unEx body))
 
-fun breakExp() =
-	SCAF (*COMPLETAR*)
+fun breakExp() = Nx (JUMP (NAME (topSalida()),[topSalida()]))
+
+
 
 fun seqExp ([]:exp list) = Nx (EXP(CONST 0))
 	| seqExp (exps:exp list) =
@@ -267,8 +267,8 @@ fun forExp {lo, hi, var, body} =
 			val (start,intermedio,fin) = (newlabel(), newlabel(),topSalida())
 	in Nx (seq [MOVE(exVar,exLo),MOVE(TEMP thi,exHi),CJUMP(GT,exVar,TEMP thi,fin,start),
 	            LABEL start,exBody,CJUMP(GE, exVar,TEMP thi,fin,intermedio),
-							LABEL intermedio, MOVE(exVar,BINOP(PLUS,exVar,CONST 1)), JUMP(NAME start,[start]),
-							LABEL fin])
+		     	LABEL intermedio, MOVE(exVar,BINOP(PLUS,exVar,CONST 1)), JUMP(NAME start,[start]),
+				LABEL fin])
 	end
 
 
@@ -276,7 +276,7 @@ fun forExp {lo, hi, var, body} =
 fun ifThenExp{test, then'} =
 	let val cf = unCx test
 	    val body = unNx then'
-			val (l1,l2) = (newlabel(),newlabel())
+	    val (l1,l2) = (newlabel(),newlabel())
 	in Nx (seq [cf(l1,l2),LABEL l1, body,LABEL l2])
 	end
 
@@ -338,11 +338,16 @@ fun binOpIntRelExp {left, oper, right} =
 	    val leftExp = unEx left
 			val rightExp = unEx right
 	    val cjump = fn (t,f) => CJUMP (oper',leftExp,rightExp,t,f)
-   in Cx (cjump)
-	 end
+   in Cx cjump
+   end
 
-fun binOpStrExp {left,oper,right} =
-	SCAF (*COMPLETAR*)
+fun binOpStrExp {left,oper,right} = let val exLeft = unEx left
+                                        val exRigth = unEx right
+										val exOper = transOpRel oper
+										val call =  CALL (NAME "_stringCompare",[exLeft,exRigth])
+										val cjump = fn (t,f) => CJUMP (exOper,call,CONST 0,t,f)
+								    in Cx cjump
+									end
 
 
 end
