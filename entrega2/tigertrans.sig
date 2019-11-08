@@ -15,7 +15,6 @@ val allocArg : level -> bool -> access
 val allocLocal : level -> bool -> access
 
 type exp
-val SCAF: exp
 val procEntryExit : {level: level, body: exp} -> unit
 val getResult : unit -> frag list
 val unitExp : unit -> exp

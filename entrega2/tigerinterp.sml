@@ -4,7 +4,7 @@
 	a: bool - false sólo ejecuta el código, true muestra en cada paso la instrucción a ejecutar y el estado de la memoria y temporarios
 	b: (tigertree.stm list*tigerframe.frame) list - cada elemento de la lista es un par con la lista de tigertree.stm devuelta por el canonizador y el frame de cada función
 	c: (tigertemp.label*string) list - Una lista con un elemento por cada string definido en el código. Cada elemento es un par formado por el label y el string.
-	inter usa: 
+	inter usa:
 		Constantes de tigerframe: wSz, rv, fp
 		Funciones de tigerframe: formals, exp. formals (Appel, pág 135) debe devolver una lista con los tigerframe.access de cada argumento pasado a la función, esto es el tigerframe.access que se usa en el body de la función para referirse a cada argumento. También debe devolver un tigerframe.access para el static link, como primer elemento de la lista.
 	Nota: en una máquina de N bits los enteros de ML tienen N-1 bits. El intérprete fallará si se usan números muy grandes.
@@ -42,7 +42,7 @@ struct
 			end
 			val loadTemp = load tabTemps
 			val storeTemp = store tabTemps
-			fun getTemps () = 
+			fun getTemps () =
 			let
 				val tabL = tabAList(!tabTemps)
 			in
@@ -116,7 +116,7 @@ struct
 			0
 		end
 		| checkIndexArray _ = raise Fail("No debería pasar (checkIndexArray)")
-		
+
 		fun allocRecord(ctos::vals) =
 		let
 			val mem = getNewMem(ctos)
@@ -127,7 +127,7 @@ struct
 			mem
 		end
 		| allocRecord _ = raise Fail("No debería pasar (allocRecord)")
-		
+
 		fun checkNil(r::rest) =
 		let
 			val _ = if (r=0) then raise Fail("Nil\n") else ()
@@ -209,7 +209,7 @@ struct
 			if (v=0) then 1 else 0
 		| notFun _ = raise Fail("No debería pasar (notFun)")
 
-		fun getstrFun(args) = 
+		fun getstrFun(args) =
 		let
 			val str = TextIO.inputLine TextIO.stdIn
 		in
@@ -349,7 +349,7 @@ struct
 				(* Poner argumentos donde la función los espera *)
 				val formals = map (fn x => tigerframe.exp x (TEMP tigerframe.fp)) (tigerframe.formals frame)
 				val formalsValues = ListPair.zip(formals, args)
-				val _ = map (fn (x,y) => 
+				val _ = map (fn (x,y) =>
 					case x of
 						TEMP t => storeTemp t y
 						| MEM m => storeMem (evalExp m) y) formalsValues

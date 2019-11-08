@@ -32,9 +32,8 @@ datatype exp =
 	Ex of tigertree.exp
 	| Nx of tigertree.stm
 	| Cx of label * label -> tigertree.stm
-	| scaf
 
-val SCAF = scaf
+
 
 fun seq [] = EXP (CONST 0)
 	| seq [s] = s
@@ -187,7 +186,7 @@ fun comparar ((_,x),(_,y)) = Int.compare (x,y)
 
 fun recordExp l = let val lOrd =  Listsort.sort comparar l
                       val lOrd' = map (fn (x,_) => unEx x) lOrd
-                  in Ex(CALL(NAME "allocRecord",[CONST (length lOrd')] @ lOrd'))
+                  in Ex(CALL(NAME "_allocRecord",[CONST (length lOrd')] @ lOrd'))
 				  end
 
 
@@ -315,6 +314,7 @@ fun transOpInt PlusOp = PLUS
  | transOpInt MinusOp  = MINUS
  | transOpInt TimesOp = MUL
  | transOpInt DivideOp  = DIV
+ | transOpInt _ = raise Fail "Cualquieraaaa"
 
 (*Agregamos*)
 fun transOpRel EqOp = EQ
@@ -323,6 +323,7 @@ fun transOpRel EqOp = EQ
  | transOpRel LeOp = LE
  | transOpRel GtOp = GT
  | transOpRel  GeOp = GE
+ | transOpRel _ = raise Fail"Cualquieraaaa"
 
 
 

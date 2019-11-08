@@ -206,14 +206,14 @@ fun transExp(venv, tenv) =
 			in	{ exp=seqExp (exprs), ty=tipo } end
 
          (*Agregamos*)
-		| trexp(AssignExp({var, exp}, nl)) = let val {ty=res,...} = trvar(var,nl)
+		| trexp(AssignExp({var, exp}, nl)) = let val {ty=res,exp=expVar} = trvar(var,nl)
 		                                     in (case res of
-											    (TInt RO) => error(msg11,nl)
-												  | t => let val {ty=t2,...} = (transExp (venv,tenv)) exp
-											           in if tiposIguales t t2 then  {exp=SCAF, ty=TUnit}
-												            else error(msg4,nl)
-														 end)
-											 end
+											                          (TInt RO) => error(msg11,nl)
+																							  | t => let val {ty=t2,exp=exp'} = (transExp (venv,tenv)) exp
+																						           in if tiposIguales t t2 then  {exp=assignExp{var=expVar,exp=exp'}, ty=TUnit}
+																							            else error(msg4,nl)
+																									 end)
+										                     end
 
 		| trexp(IfExp({test, then', else'=SOME else'}, nl)) =
 			let val {exp=testexp, ty=tytest} = trexp test
@@ -279,9 +279,9 @@ fun transExp(venv, tenv) =
 		(*Agregamos todo lo que sigue*)
 		| trexp(ArrayExp({typ, size, init}, nl)) = (case tabBusca(typ,tenv) of
 		                                             NONE => error(msg6(typ),nl)
-													| SOME (TArray (t,_)) => let val {ty=t2,...} = trexp init
-																             in if tiposIguales (!t) t2 then let val {ty=ts,...} = trexp size
-																						                     in if tiposIguales ts (TInt RW) then {exp=SCAF, ty=TUnit}
+													| SOME (TArray (t,_)) => let val {ty=t2,exp=expInit} = trexp init
+																             in if tiposIguales (!t) t2 then let val {ty=ts,exp=expSize} = trexp size
+																						                     in if tiposIguales ts (TInt RW) then {exp=arrayExp{init=expInit,size=expSize}, ty=TUnit}
 																											    else error(msg8,nl)
 																											 end
 																				else error(msg7,nl)
@@ -304,10 +304,10 @@ fun transExp(venv, tenv) =
 								        |_ => error(s ^ " no es campo de un record definido",nl))
 
 		| trvar(SubscriptVar(v, e), nl) = (case trvar(v,nl) of
-		                                 {ty=TArray (typ,_),...} => let val {ty=t,...} = trexp e
-										                            in if tiposIguales t (TInt RW) then {exp=SCAF,ty=(!typ)}
-																       else error("La expresion no es de into int",nl)
-																    end
+		                                 {ty=TArray (typ,_),exp=expVar} => let val {ty=t,exp=expInd} = trexp e
+										                                            in if tiposIguales t (TInt RW) then {exp=subscriptVar(expVar,expInd),ty=(!typ)}
+																                                   else error("La expresion no es de into int",nl)
+																                                end
 										 |_ => error("La variable no es de tipo Array",nl))
 
 		and trdec (venv, tenv) (VarDec ({name,escape,typ=NONE,init},pos)) =
@@ -405,5 +405,6 @@ fun transProg ex =
 								result=NONE, body=ex}, 0)]],
 						body=UnitExp 0}, 0)
 		val _ = transExp(tab_vars, tab_tipos) main
-	in	print "bien!\n" end
+	in	print "bien!\n"
+	 end
 end

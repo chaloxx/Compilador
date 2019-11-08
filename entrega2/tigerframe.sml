@@ -57,7 +57,7 @@ fun newFrame{name, formals} = {
 	actualLocal=ref localsInicial
 }
 fun name(f: frame) = #name f
-fun formals({formals=f, ...}: frame) = [] (* COMPLETAR *)
+
 fun allocLocal (f: frame) b =
 	case b of
 	  true =>
@@ -67,7 +67,7 @@ fun allocLocal (f: frame) b =
 		in ret end
 	| false => InReg(tigertemp.newtemp())
 val allocArg = allocLocal
-
+fun formals(f: frame) = map (allocArg f) (#formals f)
 fun string(l, s) = l^tigertemp.makeString(s)^"\n"
 fun exp(InFrame k) e = MEM(BINOP(PLUS, TEMP(fp), CONST k))
 | exp(InReg l) e = TEMP l
