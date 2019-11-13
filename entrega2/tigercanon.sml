@@ -1,4 +1,4 @@
-structure tigercanon :> tigercanon = 
+structure tigercanon :> tigercanon =
 struct
 
 open tigertab
@@ -52,30 +52,30 @@ fun linearize(stm0: stm) : stm list =
 			in	stms % build(el') end
 
 		and do_stm(SEQ(a,b)) = do_stm a % do_stm b
-		| do_stm(JUMP(e,labs)) = 
+		| do_stm(JUMP(e,labs)) =
 			reorder_stm([e],fn l => JUMP(hd l,labs))
-		| do_stm(CJUMP(p,a,b,t,f)) = 
+		| do_stm(CJUMP(p,a,b,t,f)) =
 			reorder_stm([a,b], fn l=> CJUMP(p,hd l,hd(tl l),t,f))
-		| do_stm(MOVE(TEMP t,CALL(e,el))) = 
+		| do_stm(MOVE(TEMP t,CALL(e,el))) =
 			reorder_stm(e::el,fn l => MOVE(TEMP t,CALL(hd l,tl l)))
-		| do_stm(MOVE(TEMP t,b)) = 
+		| do_stm(MOVE(TEMP t,b)) =
 			reorder_stm([b],fn l=>MOVE(TEMP t,hd l))
-		| do_stm(MOVE(MEM e,b)) = 
+		| do_stm(MOVE(MEM e,b)) =
 			reorder_stm([e,b],fn l=>MOVE(MEM(hd l),hd(tl l)))
 		| do_stm(MOVE(ESEQ(s,e),b)) = do_stm(SEQ(s,MOVE(e,b)))
-		| do_stm(EXP(CALL(e,el))) = 
+		| do_stm(EXP(CALL(e,el))) =
 			reorder_stm(e::el,fn l => EXP(CALL(hd l,tl l)))
 		| do_stm(EXP e) = reorder_stm([e],fn l=>EXP(hd l))
 		| do_stm s = reorder_stm([],fn _=>s)
 
-		and do_exp(BINOP(p,a,b)) = 
+		and do_exp(BINOP(p,a,b)) =
 			reorder_exp([a,b], fn l=>BINOP(p,hd l,hd(tl l)))
 		| do_exp(MEM(a)) = reorder_exp([a], fn l=>MEM(hd l))
-		| do_exp(ESEQ(s,e)) = 
+		| do_exp(ESEQ(s,e)) =
 			let	val stms = do_stm s
 				val (stms',e) = do_exp e
 			in	(stms%stms',e) end
-		| do_exp(CALL(e,el)) = 
+		| do_exp(CALL(e,el)) =
 			reorder_exp(e::el, fn l => CALL(hd l,tl l))
 		| do_exp e = reorder_exp([],fn _=>e)
 
@@ -90,10 +90,10 @@ fun linearize(stm0: stm) : stm list =
 type block = stm list
 
   (* Take list of statements and make basic blocks satisfying conditions
-       3 and 4 above, in addition to the extra condition that 
+       3 and 4 above, in addition to the extra condition that
       every block ends with a JUMP or CJUMP *)
 
-fun basicBlocks stms = 
+fun basicBlocks stms =
 	let	val done = tigertemp.newlabel()
 		fun blocks((head as LABEL _) :: tail, blist) =
 			let	fun next((s as (JUMP _))::rest, thisblock) =
@@ -104,11 +104,11 @@ fun basicBlocks stms =
 					next(JUMP(NAME lab,[lab])
 					:: stms, thisblock)
 				| next(s::rest, thisblock) = next(rest, s::thisblock)
-				| next(nil, thisblock) = 
+				| next(nil, thisblock) =
 					next([JUMP(NAME done, [done])],
 						thisblock)
 
-				and endblock(stms, thisblock) = 
+				and endblock(stms, thisblock) =
 					blocks(stms, rev thisblock :: blist)
 			in next(tail, [head]) end
 		| blocks(nil, blist) = rev blist
@@ -123,7 +123,7 @@ fun splitlast([x]) = (nil,x)
 | splitlast(h::t) = let val (t',last) = splitlast t in (h::t', last) end
 | splitlast _ = raise Fail "no ocurre!"
 
-fun trace(table,b as (LABEL lab :: _),rest) = 
+fun trace(table,b as (LABEL lab :: _),rest) =
 	let	val table = tabRInserta(lab, nil, table)
 	in	case splitlast b of
 		(most,JUMP(NAME lab, _)) =>
@@ -133,11 +133,11 @@ fun trace(table,b as (LABEL lab :: _),rest) =
 		| (most,CJUMP(opr,x,y,t,f)) =>
 			(case (tabBusca(t,table), tabBusca(f,table)) of
 			(_, SOME(b' as _::_)) => b @ trace(table, b', rest)
-			| (SOME(b' as _::_), _) => 
+			| (SOME(b' as _::_), _) =>
 				most @ [CJUMP(notRel opr,x,y,f,t)]
 				@ trace(table, b', rest)
 			| _ =>	let	val f' = tigertemp.newlabel()
-					in most @ [CJUMP(opr,x,y,t,f'), 
+					in most @ [CJUMP(opr,x,y,t,f'),
 						LABEL f',
 						JUMP(NAME f,[f])]
 						@ getnext(table,rest)
@@ -147,15 +147,17 @@ fun trace(table,b as (LABEL lab :: _),rest) =
 	end
 | trace _ = raise Fail "debiera ser imposible!(2)"
 
-and getnext(table,(b as (LABEL lab::_))::rest) = 
+and getnext(table,(b as (LABEL lab::_))::rest) =
 	(case tabBusca(lab, table) of
 	SOME(_::_) => trace(table,b,rest)
 	| _ => getnext(table,rest))
 | getnext(table,nil) = nil
 | getnext _ = raise Fail "no puede pasar!"
 
-fun traceSchedule(blocks,done) = 
+fun traceSchedule(blocks,done) =
        getnext(foldr enterblock (tabNueva()) blocks, blocks)
          @ [LABEL done]
+
+
 
 end

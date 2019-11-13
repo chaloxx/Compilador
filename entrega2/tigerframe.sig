@@ -22,13 +22,16 @@ val log2WSz : int
 val calldefs : tigertemp.temp list
 val callersaves : tigertemp.temp list
 val calleesaves : tigertemp.temp list
-
+val setFrame: access list -> frame -> frame
 val newFrame : {name: tigertemp.label, formals: bool list} -> frame
 val name : frame -> tigertemp.label
 val formals : frame -> access list
 val allocLocal : frame -> bool -> access
 val allocArg : frame -> bool -> access
 
+val isProc : frag -> bool
+val unProc : frag -> {body: tigertree.stm, frame: frame}
+val unString : frag ->  tigertemp.label * string
 val string : tigertemp.label * string -> string
 val exp : access -> tigertree.exp -> tigertree.exp
 val externalCall : string * tigertree.exp list -> tigertree.exp

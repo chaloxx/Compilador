@@ -2,7 +2,16 @@ open tigerlex
 open tigergrm
 open tigerescap
 open tigerseman
+open tigerframe
+open tigercanon
+open tigerinterp
 open BasicIO Nonstdio
+
+fun canonizar stm = let val lin = tigercanon.linearize stm
+                        val basics = tigercanon.basicBlocks lin
+										in tigercanon.traceSchedule basics
+										end
+
 
 fun lexstream(is: instream) =
 	Lexing.createLexer(fn b => fn n => buff_input is b 0 n);
@@ -28,9 +37,15 @@ fun main(args) =
 		val _ = findEscape(expr)
 		val _ = if arbol then tigerpp.exprAst expr else ()
 		val _ = if arbol then tigerpp.exprAst expr else ()
+		val _  = transProg(expr)
+		val frags = tigertrans.getResult()
+		val (funFrags,stringFrags) = List.partition tigerframe.isProc frags
+		val funFrags' = map (fn a => let val x = tigerframe.unProc a in (#body x, #frame x) end) funFrags
+		val stringFrags' = map (fn a => tigerframe.unString a)  stringFrags
+		val canonFunFrags = map (fn (x,y) => (canonizar x,y)) funFrags'
 	in
-		transProg(expr);
-		print "yes!!\n"
+    (tigerinterp.inter false canonFunFrags stringFrags';
+		print "yes!!\n")
 	end	handle Fail s => print("Fail: "^s^"\n")
 
 val _ = main(CommandLine.arguments())

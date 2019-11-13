@@ -211,7 +211,9 @@ struct
 
 		fun getstrFun(args) =
 		let
-			val str = TextIO.inputLine TextIO.stdIn
+			val str = (case  TextIO.inputLine TextIO.stdIn of
+			             SOME str => str
+					   			| NONE => raise Fail("No deberia pasar") )
 		in
 			storeString str
 		end
@@ -263,9 +265,10 @@ struct
 		| evalExp(CALL(f, args)) =
 			let
 				val lab = case f of
-					NAME l => l
-					| _ => raise Fail("CALL a otra cosa (no implemetado)\n")
-				val eargs = List.map evalExp args
+				  	       NAME l => l
+					        | _ => raise Fail("CALL a otra cosa (no implemetado)\n")
+						     (* transProg(expr);*)
+        val eargs = List.map evalExp args
 				(*Si lab es de biblioteca, usar la función de la tabla*)
 				val rv = case tabBusca(lab, tabLib) of
 					SOME f => f(eargs)

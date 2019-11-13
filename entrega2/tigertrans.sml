@@ -11,6 +11,9 @@ exception divCero
 type level = {parent:frame option , frame: frame, level: int}
 type access = tigerframe.access
 
+fun setAccesses (lvl:level) accessList = let val frame' = tigerframe.setFrame accessList (#frame lvl)
+							  								         in {parent = #parent lvl, frame=frame', level=(#level lvl)}
+																         end
 
 type frag = tigerframe.frag
 val fraglist = ref ([]: frag list)
