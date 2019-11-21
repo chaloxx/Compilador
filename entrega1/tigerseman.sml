@@ -11,6 +11,17 @@ type expty = {exp: exp, ty: Tipo}
 type venv = (string, EnvEntry) tigertab.Tabla
 type tenv = (string, Tipo) tigertab.Tabla
 
+
+fun typeToString TUnit = "TUnit"
+    |typeToString TNil = "TNil"
+		|typeToString (TInt _) = "TInt"
+		|typeToString TString = "TString"
+		|typeToString (TArray _) = "TArry"
+		|typeToString (TRecord _) = "TRecord"
+		|typeToString (TTipo _) = "TTipo"
+
+
+
 val tab_tipos : (string, Tipo) Tabla = tabInserList(
 	tabNueva(),
 	[("int", TInt RW), ("string", TString)])
@@ -129,14 +140,14 @@ fun transExp(venv, tenv) =
 			in
 				if tiposIguales tyl tyr then
 					case oper of
-						PlusOp => if tyl=TInt RW then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
-						| MinusOp => if tyl=TInt RW then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
-						| TimesOp => if tyl=TInt RW then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
-						| DivideOp => if tyl=TInt RW then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
-						| LtOp => if tyl=TInt RW orelse tyl=TString then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
-						| LeOp => if tyl=TInt RW orelse tyl=TString then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
-						| GtOp => if tyl=TInt RW orelse tyl=TString then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
-						| GeOp => if tyl=TInt RW orelse tyl=TString then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
+						PlusOp => if tiposIguales tyl (TInt RW) then {exp=SCAF,ty=TInt RW} else error("Error de tiposssss", nl)
+						| MinusOp => if tiposIguales tyl (TInt RW) then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
+						| TimesOp => if tiposIguales tyl (TInt RW) then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
+						| DivideOp => if tiposIguales tyl (TInt RW) then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
+						| LtOp => if tiposIguales tyl (TInt RW) orelse tyl=TString then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
+						| LeOp => if tiposIguales tyl (TInt RW) orelse tyl=TString then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
+						| GtOp => if tiposIguales tyl (TInt RW) orelse tyl=TString then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
+						| GeOp => if tiposIguales tyl (TInt RW) orelse tyl=TString then {exp=SCAF,ty=TInt RW} else error("Error de tipos", nl)
 						| _ => raise Fail "No debería pasar! (3)"
 				else error("Error de tipos", nl)
 			end
@@ -224,13 +235,13 @@ fun transExp(venv, tenv) =
 		| trexp(BreakExp nl) = {exp=SCAF, ty=TUnit}
 		| trexp(ArrayExp({typ, size, init}, nl)) = (case tabBusca(typ,tenv) of
 		                                             NONE => error(msg6(typ),nl)
-													| SOME (TArray (t,_)) => let val {ty=t2,...} = trexp init
-																             in if tiposIguales (!t) t2 then let val {ty=ts,...} = trexp size
-																						                     in if tiposIguales ts (TInt RW) then {exp=SCAF, ty=TUnit}
-																											    else error(msg8,nl)
-																											 end
-																				else error(msg7,nl)
-																			 end
+													                     | SOME (TArray (t,u)) => let val {ty=t2,...} = trexp init
+																                                        in if tiposIguales (!t) t2 then let val {ty=ts,...} = trexp size
+																						                                                            in if tiposIguales ts (TInt RW) then {exp=SCAF, ty=(TArray (t,u))}
+																											                                                  else error(msg8,nl)
+																											                  end
+																				       else error(msg7,nl)
+																			       end
 												    | SOME _ => error(msg9(typ),nl))
 
 		and trvar(SimpleVar s, nl) = (case tabBusca(s,venv) of
@@ -250,17 +261,17 @@ fun transExp(venv, tenv) =
 		| trvar(SubscriptVar(v, e), nl) = (case trvar(v,nl) of
 		                                 {ty=TArray (typ,_),...} => let val {ty=t,...} = trexp e
 										                            in if tiposIguales t (TInt RW) then {exp=SCAF,ty=(!typ)}
-																       else error("La expresion no es de into int",nl)
-																    end
-										 |_ => error("La variable no es de tipo Array",nl))
+																                   else error("La expresion no es de into int",nl)
+																                                  end
+										                  |{ty,...} => error("La variable tiene tipo " ^ typeToString(ty),nl))
 
 		and trdec (venv, tenv) (VarDec ({name,escape,typ=NONE,init},pos)) =
 		                                   let val {ty=t,...} = (transExp (venv,tenv)) init
-										   in if tiposIguales t TNil then error("Nil no puede ser asignado en variables que no tenga un tipo record",pos)
-										      else let val venv' = tabRInserta(name,Var {ty=t},venv)
-												   in (venv',tenv,[])
-												   end
-										   end
+										                   in if tiposIguales t TNil then error("Nil no puede ser asignado en variables que no tenga un tipo record",pos)
+										                      else let val venv' = tabRInserta(name,Var {ty=t},venv)
+												                       in (venv',tenv,[])
+												                       end
+										                   end
 
 		| trdec (venv,tenv) (VarDec ({name,escape,typ=SOME s,init},pos)) = let val {ty=t,...} = transExp (venv,tenv) init
 		                                                                   in (case tabBusca(s,tenv) of
@@ -334,7 +345,7 @@ fun transExp(venv, tenv) =
 fun transProg ex =
 	let	val main =
 				LetExp({decs=[FunctionDec[({name="_tigermain", params=[],
-								result=NONE, body=ex}, 0)]],
+								result=SOME "int", body=ex}, 0)]],
 						body=UnitExp 0}, 0)
 		val _ = transExp(tab_vars, tab_tipos) main
 	in	print "bien!\n" end

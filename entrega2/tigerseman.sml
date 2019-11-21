@@ -156,21 +156,21 @@ fun transExp(venv, tenv) =
 			in
 				if tiposIguales tyl tyr then
 					case oper of
-						PlusOp => if  tyl=TInt RW then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt RW} else error("Error de tipos", nl)
-						| MinusOp => if  tyl=TInt RW then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt RW} else error("Error de tipos", nl)
-						| TimesOp => if  tyl=TInt RW then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt RW} else error("Error de tipos", nl)
-						| DivideOp => if  tyl=TInt RW then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt RW} else error("Error de tipos", nl)
-						| LtOp => if  tyl=TInt RW orelse  tyl=TString then
-							{exp=if  tyl=TInt RW then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt RW}
+						PlusOp => if  tiposIguales tyl (TInt RW) then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt RW} else error("Error de tipos", nl)
+						| MinusOp => if  tiposIguales tyl (TInt RW) then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt RW} else error("Error de tipos", nl)
+						| TimesOp => if  tiposIguales tyl (TInt RW) then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt RW} else error("Error de tipos", nl)
+						| DivideOp => if  tiposIguales tyl (TInt RW) then {exp=binOpIntExp {left=expl, oper=oper, right=expr},ty=TInt RW} else error("Error de tipos", nl)
+						| LtOp => if  tiposIguales tyl (TInt RW) orelse  tyl=TString then
+							{exp=if  tiposIguales tyl (TInt RW) then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt RW}
 							else error("Error de tipos", nl)
-						| LeOp => if  tyl=TInt RW orelse  tyl=TString then
-							{exp=if  tyl=TInt RW then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt RW}
+						| LeOp => if  tiposIguales tyl (TInt RW) orelse  tyl=TString then
+							{exp=if  tiposIguales tyl (TInt RW) then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt RW}
 							else error("Error de tipos", nl)
-						| GtOp => if  tyl=TInt RW orelse  tyl=TString then
-							{exp=if  tyl=TInt RW then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt RW}
+						| GtOp => if  tiposIguales tyl (TInt RW) orelse  tyl=TString then
+							{exp=if  tiposIguales tyl (TInt RW) then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt RW}
 							else error("Error de tipos", nl)
-						| GeOp => if  tyl=TInt RW orelse  tyl=TString then
-							{exp=if  tyl=TInt RW then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt RW}
+						| GeOp => if  tiposIguales tyl (TInt RW) orelse  tyl=TString then
+							{exp=if  tiposIguales tyl (TInt RW) then binOpIntRelExp {left=expl,oper=oper,right=expr} else binOpStrExp {left=expl,oper=oper,right=expr},ty=TInt RW}
 							else error("Error de tipos", nl)
 						| _ => raise Fail "No debería pasar! (3)"
 				else error("Error de tipos", nl)
@@ -279,9 +279,9 @@ fun transExp(venv, tenv) =
 		(*Agregamos todo lo que sigue*)
 		| trexp(ArrayExp({typ, size, init}, nl)) = (case tabBusca(typ,tenv) of
 		                                             NONE => error(msg6(typ),nl)
-													| SOME (TArray (t,_)) => let val {ty=t2,exp=expInit} = trexp init
+													| SOME (TArray (t,u)) => let val {ty=t2,exp=expInit} = trexp init
 																             in if tiposIguales (!t) t2 then let val {ty=ts,exp=expSize} = trexp size
-																						                     in if tiposIguales ts (TInt RW) then {exp=arrayExp{init=expInit,size=expSize}, ty=TUnit}
+																						                     in if tiposIguales ts (TInt RW) then {exp=arrayExp{init=expInit,size=expSize}, ty=(TArray (t,u))}
 																											    else error(msg8,nl)
 																											 end
 																				else error(msg7,nl)
@@ -388,7 +388,8 @@ fun transExp(venv, tenv) =
 									 val ntaParams = zip3 nameParams typsParams accessList
 									 val venv' = List.foldl (fn ((s,t,a),v) => tabRInserta(s,Var {ty=t,access=a,level=(#level lvl')},v)) venv ntaParams
 									 val res = (transExp (venv',tenv)) (#body r)
-                                     val tyRes = #ty res
+                   val tyRes = #ty res
+									 val _ = functionDec(#exp res,lvl',tiposIguales tyRes TUnit)
 						    in (case #result r of
 							    NONE => if tiposIguales tyRes TUnit then res
 								        else error(name ^ " es un procedimiento y no puede retornar un valor",nl)
@@ -404,9 +405,10 @@ fun transExp(venv, tenv) =
 fun transProg ex =
 	let	val main =
 				LetExp({decs=[FunctionDec[({name="_tigermain", params=[],
-								result=NONE, body=ex}, 0)]],
+								result=SOME "int", body=ex}, 0)]],
 						body=UnitExp 0}, 0)
 		val _ = transExp(tab_vars, tab_tipos) main
+
 	in	print "bien!\n"
 	 end
 end
