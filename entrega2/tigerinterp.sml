@@ -209,6 +209,10 @@ struct
 			if (v=0) then 1 else 0
 		| notFun _ = raise Fail("No debería pasar (notFun)")
 
+		fun printInt(c::cs : int list) = let val s = Int.toString(c)
+		                      in print(s);0
+													end
+
 		fun getstrFun(args) =
 		let
 			val str = (case  TextIO.inputLine TextIO.stdIn of
@@ -233,7 +237,8 @@ struct
 				("substring", substringFun),
 				("concat", concatFun),
 				("not", notFun),
-				("getstr", getstrFun)])
+				("getstr", getstrFun),
+				("printInt",printInt)])
 
 		(* Evalúa una expresión, devuelve el valor (entero) *)
 		fun evalExp(CONST t) = t
@@ -351,6 +356,8 @@ struct
 				val _ = storeTemp tigerframe.fp (fpPrev-1024*1024)
 				(* Poner argumentos donde la función los espera *)
 				val formals = map (fn x => tigerframe.exp x (TEMP tigerframe.fp)) (tigerframe.formals frame)
+				val _ = print("args:"^Int.toString(length(args))^"\n")
+				val _ = print("formals:"^Int.toString(length(formals))^"\n")
 				val formalsValues = ListPair.zip(formals, args)
 				val _ = map (fn (x,y) =>
 					case x of

@@ -45,6 +45,8 @@ val tab_vars : (string, EnvEntry) Tabla = tabInserList(
 	("not", Func{level=topLevel(), label="not",
 		formals=[TInt RW], result=TInt RW, extern=true}),
 	("exit", Func{level=topLevel(), label="exit",
+		formals=[TInt RW], result=TUnit, extern=true}),
+	("printInt", Func{level=topLevel(), label="printInt",
 		formals=[TInt RW], result=TUnit, extern=true})
 	])
 
@@ -381,13 +383,16 @@ fun transExp(venv, tenv) =
 					    					                     NONE => raise Fail "Basura"
 							    								 |SOME (Func f) => #formals f
 										    					 | SOME _ => raise Fail "Basura")
-									 val lvl = topLevel()
-									 val accessList = map (fn e => allocArg lvl (!e)) escapes
+									 val lvl:level = topLevel()
+									 val f : tigerframe.frame = #frame lvl
+									 val vls = tigerframe.formals f
+									 val accessList = map (fn e => allocArg lvl e) vls
 									 val lvl' = tigertrans.setAccesses lvl accessList
 									 val _ = (popLevel();pushLevel(lvl'))
 									 val ntaParams = zip3 nameParams typsParams accessList
 									 val venv' = List.foldl (fn ((s,t,a),v) => tabRInserta(s,Var {ty=t,access=a,level=(#level lvl')},v)) venv ntaParams
 									 val res = (transExp (venv',tenv)) (#body r)
+									 val _ = popLevel()
                    val tyRes = #ty res
 									 val _ = functionDec(#exp res,lvl',tiposIguales tyRes TUnit)
 						    in (case #result r of

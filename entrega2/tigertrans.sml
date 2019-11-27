@@ -110,6 +110,7 @@ fun procEntryExit{level: level, body} =
 	let	val label = STRING(name(#frame level), "")
 		val body' = PROC{frame= #frame level, body=unNx body}
 		val final = STRING(";;-------", "")
+		
 	in	datosGlobs:=(!datosGlobs@[label, body', final]) end
 fun getResult() = !datosGlobs
 
@@ -128,7 +129,7 @@ fun stringExp(s: string) =
 fun preFunctionDec() =
 	(pushSalida(NONE);
 	actualLevel := !actualLevel+1)
-fun functionDec(e, l, proc) =
+fun functionDec(e, l:level, proc) =
 	let	val body =
 				if proc then unNx e
 				else MOVE(TEMP rv, unEx e)

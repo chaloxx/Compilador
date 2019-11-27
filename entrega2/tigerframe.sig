@@ -26,6 +26,7 @@ val setFrame: access list -> frame -> frame
 val newFrame : {name: tigertemp.label, formals: bool list} -> frame
 val name : frame -> tigertemp.label
 val formals : frame -> access list
+val formals2 : frame -> bool list
 val allocLocal : frame -> bool -> access
 val allocArg : frame -> bool -> access
 
